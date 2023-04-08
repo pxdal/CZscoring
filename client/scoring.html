@@ -1,3 +1,18 @@
 <!DOCTYPE html>
 <html>
+	<head>
+		<title>Scoring Page</title>
+	</head>
+	<body>
+		<script type="module">
+			import { Scoresheet } from "/static/js/score.mjs";
+			import { ballblast } from "/static/js/games/ballblast.mjs";
+			
+			const scoresheet = new Scoresheet(ballblast);
+			
+			document.body.appendChild(scoresheet.domElement);
+			
+			console.log(scoresheet);
+		</script>
+	</body>
 </html>

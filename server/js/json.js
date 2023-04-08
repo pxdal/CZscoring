@@ -28,6 +28,9 @@ async function readJsonFromFile(path){
 	});
 }
 
+/**
+	*	@brief Reads json from file `path` and returns object containg parsed data, synchronously
+*/
 function readJsonFromFileSync(path){
 	const data = fs.readFileSync(path);
 	
