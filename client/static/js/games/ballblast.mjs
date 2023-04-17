@@ -3,7 +3,7 @@
 import { ScoresheetTemplate } from "/static/js/score.mjs";
 
 export const ballblast = new ScoresheetTemplate()
-	.createSection("Autonomous")
+	.createSection("Autonomous") // autonomous
 		.addObjective({
 			name: "Balls Scored",
 			value: 4
@@ -13,7 +13,12 @@ export const ballblast = new ScoresheetTemplate()
 			type: "checkbox",
 			value: 10
 		})
-	.createSection("TeleOp")
+		.addObjective({
+			name: "Flip Over Other Robot",
+			type: "checkbox",
+			value: 5
+		})
+	.createSection("TeleOp") // teleop
 		.addObjective({
 			name: "Test Dropdown",
 			type: "dropdown",
@@ -21,10 +26,10 @@ export const ballblast = new ScoresheetTemplate()
 			options: ["Bad", "Meh", "Good"]
 		})
 		.addObjective({
-			name: "Me me BIG boy",
-			value: 2000
+			name: "its ball time",
+			value: 10
 		})
-	.createSection("End Game")
+	.createSection("End Game") // end game
 		.addObjective({
 			name: "Aaaaaa",
 			type: "dropdown",

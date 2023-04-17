@@ -32,9 +32,7 @@ const websocketEvents = {
 	// replies with the time at which it received the request
 	ping: function(socket){
 		socket.emit("pong", (new Date()).valueOf());
-	},
-	
-	
+	}
 };
 
 // MAIN //

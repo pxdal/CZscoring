@@ -12,6 +12,15 @@
 			
 			document.body.appendChild(scoresheet.domElement);
 			
+			const indicator = scoresheet.createScoreIndicator({
+				id: "main-indicator",
+				text: "Score: {score}",
+				autoupdate: true
+			});
+			
+			// append indicator
+			document.body.appendChild(indicator.domElement);
+			
 			console.log(scoresheet);
 		</script>
 	</body>
