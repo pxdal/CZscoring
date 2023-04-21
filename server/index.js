@@ -8,6 +8,7 @@ const express = require("express");
 const http = require("http");
 const path = require("path");
 const { readJsonFromFile, readJsonFromFileSync } = require("./js/json.js");
+const { ChallongeAPI } = require("./js/challonge.js");
 
 // constants //
 
@@ -32,7 +33,9 @@ const websocketEvents = {
 	// replies with the time at which it received the request
 	ping: function(socket){
 		socket.emit("pong", (new Date()).valueOf());
-	}
+	},
+	
+	// 
 };
 
 // MAIN //
@@ -43,6 +46,13 @@ const server = http.createServer(app);
 
 // socket.io setup
 const io = new Server(server);
+
+// challonge setup
+const challongeClient = new ChallongeAPI({
+	clientId: "88e98a856727a4532b4c99e819cb3c80512072d81f4db49668587f9aea1592b8",
+	clientSecret: "00b7a543c8e1e0033562582e23b0b2463f2923f09b0dfee1d139ef810f4cb148",
+	redirectUri: "http://localhost/oauth"
+});
 
 // basic html file serves
 for(const path of Object.keys(paths)){
@@ -60,6 +70,35 @@ for(const path of Object.keys(paths)){
 
 // static resources
 app.use("/static/", express.static(staticResourcesPath));
+
+// special paths
+
+// redirect uri for challonge oauth, automatically fetches fresh tokens for the challonge api
+app.get("/oauth", (req, res) => {
+	// get code
+	const code = req.query.code;
+	
+	// get tokens from code
+	challongeClient.getFreshTokens(code)
+		.then(status => {
+			const file = "login" + (status ? "success" : "failure") + ".html";
+			
+			// send status to user
+			res.sendFile(file, {
+				root: clientPath
+			});
+		});
+});
+
+// send back data on whether a oauth login is currently required or not
+// NOTE: only based off of access token because I don't really plan on using the refresh token
+// includes the oauth url in the responsew
+app.get("/tokenstatus", (req, res) => {
+	res.send({
+		hasToken: challongeClient.hasAccessToken(),
+		oauthUrl: challongeClient.getOAuthUrl()
+	});
+});
 
 // websocket requests/responses...
 io.on("connection", socket => {
