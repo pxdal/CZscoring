@@ -18,6 +18,7 @@ const staticResourcesPath = path.join(clientPath, "/static");
 
 // file paths
 const pathsFile = path.join(__dirname, "paths.json");
+const credentialsFile = path.join(__dirname, "credentials.json");
 
 // other misc.
 const port = 80;
@@ -48,10 +49,15 @@ const server = http.createServer(app);
 const io = new Server(server);
 
 // challonge setup
+
+// get challonge credentials
+const { clientId, clientSecret, redirectUri } = readJsonFromFileSync(credentialsFile);
+
+// create challonge api client
 const challongeClient = new ChallongeAPI({
-	clientId: "88e98a856727a4532b4c99e819cb3c80512072d81f4db49668587f9aea1592b8",
-	clientSecret: "00b7a543c8e1e0033562582e23b0b2463f2923f09b0dfee1d139ef810f4cb148",
-	redirectUri: "http://localhost/oauth"
+	clientId: clientId,
+	clientSecret: clientSecret,
+	redirectUri: redirectUri
 });
 
 // basic html file serves

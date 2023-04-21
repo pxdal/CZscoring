@@ -4,5 +4,4 @@ significant changes between each commit will be written below to avoid clogging 
 
 # changes:
 
-- started work on challonge api support
-	- implemented simple oauth flow
+- removed credentials from index.js (accidentally committed them last time, they've been updated since)
