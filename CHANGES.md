@@ -4,5 +4,5 @@ significant changes between each commit will be written below to avoid clogging 
 
 # changes:
 
-- added "score indicators" which displays the score of a scoresheet and can automatically update for input changes
-- Scoresheet domElement property now works correctly
+- started work on challonge api support
+	- implemented simple oauth flow

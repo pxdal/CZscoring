@@ -9,6 +9,10 @@
 				margin: 10px;
 			}
 			
+			p {
+				text-align: center;
+			}
+			
 			.center {
 				display: block;
 				margin-left: auto;
@@ -17,8 +21,42 @@
 		</style>
 	</head>
 	<body>
-		<a href="/scoring">Scoring View</a>
-		<a href="/display">Audience View</a>
-		<img class="center" src="https://media4.giphy.com/media/voiiLWvpY2UZa/giphy.gif" />
+		<div id="main-container" style="display: none">
+			<a href="/scoring">Scoring View</a>
+			<a href="/display">Audience View</a>
+			<img class="center" src="https://media4.giphy.com/media/voiiLWvpY2UZa/giphy.gif" />
+		</div>
+		
+		<p id="status">Checking if login is required...</p>
+		
+		<script type="text/javascript">
+			window.addEventListener("load", e => {
+				// get elements
+				const mainContainer = document.getElementById("main-container");
+				const statusElement = document.getElementById("status");
+				
+				// check if login is required
+				fetch("/tokenstatus")
+					.then(res => res.json())
+					.then(data => {
+						// extract data
+						const { hasToken, oauthUrl } = data;
+						
+						// if token is present, show page
+						// otherwise update status to let user know that login is required
+						if(hasToken){
+							// show page
+							mainContainer.style.display = "block";
+							
+							// update status
+							statusElement.textContent = "";
+						} else {
+							// update status
+							statusElement.innerHTML = "Login required, click <a href=\""+oauthUrl+"\">here</a> to log in";
+						}
+					})
+					.catch(console.error);
+			});
+		</script>
 	</body>
 </html>

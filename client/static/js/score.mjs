@@ -529,7 +529,7 @@ export class Scoresheet extends EventTarget {
 	}
 	
 	/**
-		*	@brief updates the score indicator with the score of this scoresheet
+		*	@brief updates the score indicator with the score of this scoresheet	
 	*/
 	updateScoreIndicator(indicator){
 		indicator.scoreIndicator.textContent = this.getScore() + "";

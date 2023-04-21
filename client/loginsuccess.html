@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>Login Successful</title>
+		<style>
+			p {
+				text-align: center;
+			}
+		</style>
+	</head>
+	<body>
+		<p>Logged in successfully, you will be redirected shortly... (or click <a href="/">here</a>)</p>
+		
+		<script type="text/javascript">
+			window.addEventListener("load", () => {
+				setTimeout(() => {
+					window.open("/", "_self");
+				}, 2500);
+			});
+		</script>
+	</body>
+</html>
