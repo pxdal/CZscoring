@@ -23,17 +23,81 @@
 	<body>
 		<div id="main-container" style="display: none">
 			<a href="/scoring">Scoring View</a>
-			<a href="/display">Audience View</a>
-			<img class="center" src="https://media4.giphy.com/media/voiiLWvpY2UZa/giphy.gif" />
+			<!-- <a href="/display">Audience View</a> -->
+			<img id="funny-picture" class="center" src="https://media4.giphy.com/media/voiiLWvpY2UZa/giphy.gif" title="the game was called cone zone when I started..."/>
 		</div>
 		
 		<p id="status">Checking if login is required...</p>
 		
 		<script type="text/javascript">
+			const funnyPictures = [
+				{
+					url: "https://i.gifer.com/JZWL.gif",
+					title: "consider your balls...blasted"
+				},
+				{
+					url: "https://media4.giphy.com/media/voiiLWvpY2UZa/giphy.gif",
+					title: "the game was called cone zone when I started..."
+				},
+				{
+					url: "https://lh3.googleusercontent.com/rCOnilsrhmRp17mrgdGB2a80y46JSg4sAKaRHyIezCxhkcjB1aZqjStdgHDYxq6RrSRgBa9MqaAOtfDKGAfVmQL09qf9wI8o9muAmForlIHoO6A9NnIxoRLJo5MdyTvK4g=w1280",
+					title: "all alone...",
+					width: "480"
+				},
+				{
+					url: "https://media.discordapp.net/attachments/1075221727040258108/1082267713637990450/IMG_1714.png",
+					title: "rev me bro"
+				},
+				{
+					url: "https://cdn.discordapp.com/attachments/1019731582812176416/1083215950398107670/IMG_1742.png",
+					title: "boom",
+					width: "350"
+				},
+				{
+					url: "https://cdn.discordapp.com/attachments/1019731582812176416/1081762101170819083/IMG_4126.jpg",
+					title: "brought to you by this idiot",
+					width: "400"
+				},
+				{
+					url: "https://cdn.discordapp.com/attachments/1019731582812176416/1076266791606685746/phoenixMeme.gif",
+					title: "no comment..."
+				},
+				{
+					url: "https://media.discordapp.net/attachments/1019731582812176416/1074345021559558254/image.png",
+					title: "we're pretty cool"
+				},
+				{
+					url: "https://cdn.discordapp.com/attachments/1019731582812176416/1074129718162489395/IMG_1635.png",
+					title: "lol",
+					width: "400"
+				},
+				{
+					url: "https://media.discordapp.net/attachments/1019731582812176416/1069800927072112650/image.png",
+					title: "real"
+				},
+				{
+					url: "https://media.discordapp.net/attachments/1019731582812176416/1056571685781901402/image.png",
+					title: "filliam wang"
+				},
+				{
+					url: "https://media.discordapp.net/attachments/1019731582812176416/1052333135301460000/Screenshot_2022-11-27_205941.png",
+					title: "hey how you doin lil mama let me whisper in ya ear"
+				}
+			];
+			
 			window.addEventListener("load", e => {
 				// get elements
 				const mainContainer = document.getElementById("main-container");
 				const statusElement = document.getElementById("status");
+				const funnyPicture = document.getElementById("funny-picture");
+				
+				// randomize funny picture
+				const picData = funnyPictures[Math.floor(Math.random()*funnyPictures.length)];
+				
+				if(picData.url) funnyPicture.src = picData.url;
+				if(picData.title) funnyPicture.title = picData.title;
+				if(picData.width) funnyPicture.width = picData.width;
+				if(picData.height) funnyPicture.height = picData.height;
 				
 				// check if login is required
 				fetch("/tokenstatus")

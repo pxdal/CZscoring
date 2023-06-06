@@ -2,13 +2,16 @@
 <html>
 	<head>
 		<title>Scoring Page</title>
+		
+		<script src="/socket.io/socket.io.js"></script>
 	</head>
 	<body>
 		<script type="module">
 			import { Scoresheet } from "/static/js/score.mjs";
+			import { TournamentManager } from "/static/js/tournament.mjs";
 			import { ballblast } from "/static/js/games/ballblast.mjs";
 			
-			const scoresheet = new Scoresheet(ballblast);
+			/*const scoresheet = new Scoresheet(ballblast);
 			
 			document.body.appendChild(scoresheet.domElement);
 			
@@ -22,8 +25,15 @@
 			
 			// append indicator
 			document.body.appendChild(indicator.domElement);
+			*/
 			
-			console.log(scoresheet);
+			// create tournament manager
+			const tourneyManager = new TournamentManager({
+				template: ballblast
+			});
+			
+			// append dom element
+			document.body.appendChild(tourneyManager.domElement);
 		</script>
 	</body>
 </html>
