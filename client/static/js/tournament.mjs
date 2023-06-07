@@ -64,18 +64,28 @@ export class TournamentManager {
 			
 			// create scoresheets
 			for(const match of this.matches){
-				const participants = match.participants;
+				const { participants, scoreInfoCaches } = match;
 				
 				// one scoresheet per participant
 				for(let i = 0; i < Object.keys(participants).length; i++){
-					// create scoresheet
-					const scoresheet = new Scoresheet(this.template);
+					// get score info
+					const scoreInfo = scoreInfoCaches["player" + (i+1)];
 					
+					// create scoresheet
+					const scoresheet = new Scoresheet({
+						template: this.template,
+						scoreInfo: scoreInfo
+					});
+					
+					// TODO: why are ids required?  doesn't make a lot of sense
 					const indicator = scoresheet.createScoreIndicator({
-						id: match.id + "-" + i,
+						id: match.id + "-" + i + "-score-indicator", // just using this because I know it's a unique id
 						text: "Score: {score}",
 						autoupdate: true
 					});
+					
+					// TODO: kinda hacky to adjust the margin here?
+					indicator.domElement.style["margin-top"] = "12px";
 					
 					const container = document.createElement("div");
 					
@@ -200,6 +210,15 @@ export class TournamentManager {
 		
 		this.domElement.appendChild(scoresheetContainer);
 		
+		// create submit button //
+		const submitButton = document.createElement("button");
+		
+		submitButton.textContent = "Send Score to Challonge";
+		
+		submitButton.addEventListener("click", this.sendCurrentScoreToChallonge.bind(this));
+		
+		this.domElement.appendChild(submitButton);
+		
 		// update
 		this.update();
 	}
@@ -263,6 +282,49 @@ export class TournamentManager {
 	}
 	
 	/**
+		*	@return the index of the scoresheet based on current match and selected alliance
+	*/
+	getCurrentScoresheetIndex(){
+		const index = (this.currentMatch-1)*2 + this.getSelectedAllianceIndex();
+		
+		return index;
+	}
+	
+	/**
+		*	@return the current scoresheet based on current match and selected alliance
+	*/
+	getCurrentScoresheet(){
+		return this.scoresheets[this.getCurrentScoresheetIndex()];
+	}
+	
+	/**
+		*	@return the current scoresheet element based on current match and selected alliance
+	*/
+	getCurrentScoresheetElement(){
+		return this.scoresheetElements[this.getCurrentScoresheetIndex()];
+	}
+	
+	/**
+		*	@return the score of the current match + alliance based on scoresheet
+	*/
+	getCurrentScoresheetScore(){
+		const scoresheet = this.getCurrentScoresheet();
+		
+		return scoresheet.getScore();
+	}
+	
+	/**
+		*	@return the score info of the current match + alliance
+	*/
+	getCurrentScoresheetScoreInfo(){
+		const scoresheet = this.getCurrentScoresheet();
+		
+		console.log(scoresheet.getScoreInfo());
+		
+		return scoresheet.getScoreInfo();
+	}
+	
+	/**
 		* Update the h1 element used to display the match number with the correct number
 		*
 		*	@todo validate current match?
@@ -302,10 +364,12 @@ export class TournamentManager {
 		this.updateMatchOpponents();
 	}
 	
+	sendCurrentScoreToChallonge(){
+		this.socket.emit("sendMatchScore", this.currentMatch, this.getSelectedAllianceIndex()+1, this.getCurrentScoresheetScoreInfo());
+	}
+	
 	loadScoresheet(){
-		const index = (this.currentMatch-1)*2 + this.getSelectedAllianceIndex();
-		
-		const scoresheetElement = this.scoresheetElements[index];
+		const scoresheetElement = this.getCurrentScoresheetElement();
 		
 		if(!scoresheetElement) return;
 		

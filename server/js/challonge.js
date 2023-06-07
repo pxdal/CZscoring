@@ -251,6 +251,42 @@ class ChallongeAPI {
 		return players;
 	}
 	
+	/**
+		*	send a pair of scores to challonge
+		*
+		*	scores:
+		* {
+		*		player1: {
+		*			uploadId: string,
+		*			score: string
+		*		}, player2: ...
+		*	}
+	*/
+	async sendScoresForMatch(tournamentId, matchId, scores){
+		// determines advancement (tied = both advance)
+		const player1Advancing = scores.player1.score > scores.player2.score;
+		const player2Advancing = scores.player2.score > scores.player1.score;
+		
+		return this.apiRequest("/tournaments/" + tournamentId + "/matches/" + matchId + ".json", "PUT", {
+			data: {
+				type: "Match",
+				attributes: {
+					match: [
+						{
+							participant_id: scores.player1.uploadId,
+							score_set: scores.player1.score.toString(),
+							advancing: player1Advancing
+						},
+						{
+							participant_id: scores.player2.uploadId,
+							score_set: scores.player2.score.toString(),
+							advancing: player2Advancing
+						}
+					]
+				}
+			}
+		});
+	}
 	
 	// DATA FILTER METHODS (filter data returned by api, sometimes making api requests as well) //
 	
@@ -315,6 +351,10 @@ class ChallongeTwoStageTournament {
 		*				name: string,
 		*				uploadId: string
 		*			}, player2: ...
+		*		},
+		*		scores: {
+		*			player1: string,
+		*			player2: string
 		*		}
 		* }
 		*
@@ -351,6 +391,15 @@ class ChallongeTwoStageTournament {
 		
 		// delete config
 		delete this.config;
+	}
+	
+	createMatchData(id, participants){
+		return {
+			id: id,
+			participants: participants,
+			scores: {},
+			scoreInfoCaches: {}
+		};
 	}
 	
 	/**
@@ -409,16 +458,16 @@ class ChallongeTwoStageTournament {
 				}
 			}
 			
-			this.matches.push({
-				id: matchId,
-				participants: participants
-			});
+			this.matches.push(this.createMatchData(matchId, participants));
 		}
 		
 		// indicate that data is available
 		this.hasData = true;
 	}
 	
+	/**
+		*	@note we use participant data to cache certain features that we don't want to waste api requests on, such as the participant's name.  these are always cached by the upload id of the participant.  this creates some weird problems with final stage matches because they use the right id (challonge api sucks), but it's not a huge deal
+	*/
 	getParticipantData(uploadId, key){
 		if(!this.participantData[uploadId]) return undefined;
 		
@@ -429,6 +478,36 @@ class ChallongeTwoStageTournament {
 		if(!this.participantData[uploadId]) this.participantData[uploadId] = {};
 		
 		this.participantData[uploadId][key] = data;
+	}
+	
+	setMatchScore(matchIndex, player, scoreInfo){
+		// get match
+		const match = this.matches[matchIndex];
+		
+		// extract score
+		const score = scoreInfo.score;
+		
+		// save score
+		match.scores["player" + player] = score;
+		
+		// save score information
+		match.scoreInfoCaches["player" + player] = scoreInfo;
+		
+		// check if enough scores are available to send to challonge
+		// TODO: rate limit/check if score is unique
+		if(Object.keys(match.scores).length > 1){
+			// send scores to challonge
+			this.api.sendScoresForMatch(this.id, match.id, {
+				player1: {
+					uploadId: match.participants.player1.uploadId,
+					score: match.scores.player1
+				},
+				player2: {
+					uploadId: match.participants.player2.uploadId,
+					score: match.scores.player2
+				}
+			}).catch(console.error);
+		}
 	}
 };
 

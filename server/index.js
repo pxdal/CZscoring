@@ -86,6 +86,16 @@ const websocketEvents = {
 			socket.emit("receiveTournamentInfo", tournamentManager.matches);
 		})
 		.catch(console.error);
+	},
+	
+	/**
+	*/
+	sendMatchScore: function(socket, match, player, scoreInfo){
+		// format properly from clientside (indexes matches at 1)
+		match -= 1;
+		
+		// set match score in tournament manager
+		tournamentManager.setMatchScore(match, player, scoreInfo);
 	}
 };
 

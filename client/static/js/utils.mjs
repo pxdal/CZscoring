@@ -21,6 +21,8 @@ export function validateOptions(obj, options, optionDetails){
 	
 	const keys = Object.keys(options);
 	
+	obj.config = {};
+	
 	// loop through options and:
 	// 1. ensure all required options are present
 	// 2. add all options to this object
@@ -52,8 +54,6 @@ export function validateOptions(obj, options, optionDetails){
 		}
 		
 		if(config){
-			if(!obj.config) obj.config = {};
-			
 			obj.config[name] = val;
 		} else {
 			obj[name] = val;

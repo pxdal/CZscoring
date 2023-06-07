@@ -53,6 +53,6 @@ the software can then be used by navigation to the url provided and following in
 
 ./client holds the code for the clients, and is generally responsible for exposing the ref's scoring UI, the audience's active view of the scoring, etc.
 
-## http vs. websockets
+## http vs. websockets in CZScoring
 
-this project makes use of both plain http requests via fetch and websocket communication via socket.io.  generally speaking, websockets are only used when information needs to be available to other clients unprompted, usually to communicate the activity of other clients.  for example, updating match scores in real time for the audience display communicates the activity of the referees (clients) as they score the match.
+this project makes use of both plain http requests via fetch and websocket communication via socket.io.  generally speaking, websockets are only used when information needs to be available to other clients unprompted, usually to communicate the activity of other clients.  for example, updating match scores in real time for the audience display communicates the activity of the referees (clients) as they score the match.  however, they're generally more convenient a lot of the time, so I've decided that for this project they'll be used for anything involving communication between a scoring client and the server as well.  it honestly doesn't really matter that much to me personally, so I'm just rolling with a more intuitive feel and seeing what feels easier for the given task.

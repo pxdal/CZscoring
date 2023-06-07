@@ -94,13 +94,31 @@ export class Scoresheet extends EventTarget {
 	// don't write to this!
 	objectives = [];
 	
-	constructor(template){
+	constructor(options){
 		super();
 		
-		this.template = template;
+		validateOptions(this, options, [
+			{
+				name: "template",
+				required: true,
+				types: ["ScoresheetTemplate"]
+			},
+			{
+				name: "scoreInfo",
+				required: false,
+				types: ["object"],
+				config: true
+			}
+		]);
 		
 		// construct html
 		this.constructHTML();
+		
+		// set score from score info if provided
+		if(this.config.scoreInfo) this.setScoreFromScoreInfo(this.config.scoreInfo);
+		
+		// delete config
+		delete this.config;
 	}
 	
 	/**
@@ -197,7 +215,7 @@ export class Scoresheet extends EventTarget {
 		// create container
 		const container = document.createElement("div");
 		
-		container.id = convertToIdFormat(name + "-section-container");
+		//container.id = convertToIdFormat(name + "-section-container");
 		
 		// create header
 		const header = document.createElement("h2");
@@ -208,7 +226,7 @@ export class Scoresheet extends EventTarget {
 		// create the objective container
 		const objectiveContainer = document.createElement("div");
 		
-		objectiveContainer.id = convertToIdFormat(name + "-objective-container");
+		//objectiveContainer.id = convertToIdFormat(name + "-objective-container");
 		
 		// push elements to container
 		container.appendChild(header);
@@ -247,14 +265,14 @@ export class Scoresheet extends EventTarget {
 		// create container
 		const container = document.createElement("div");
 		
-		container.id = convertToIdFormat(name + "-container");
+		//container.id = convertToIdFormat(name + "-container");
 		
 		// construct input box
 		const input = document.createElement("input");
 		
 		// format input box
 		input.type = "number";
-		input.id = convertToIdFormat(name + "-input");
+		//input.id = convertToIdFormat(name + "-input");
 		
 		// add event listener
 		input.addEventListener("change", e => {
@@ -266,11 +284,11 @@ export class Scoresheet extends EventTarget {
 		
 		// format label
 		label.textContent = name + " (" + value + " points each) ";
-		label.htmlFor = input.id;
+		//label.htmlFor = input.id;
 		
 		// push elements to container
+		label.appendChild(input);
 		container.appendChild(label);
-		container.appendChild(input);
 		
 		return this.constructObjectiveInfoTable(name, "number", value, container, input);
 	}
@@ -285,13 +303,13 @@ export class Scoresheet extends EventTarget {
 		// create container
 		const container = document.createElement("div");
 		
-		container.id = convertToIdFormat(name + "-container");
+		//container.id = convertToIdFormat(name + "-container");
 		
 		// construct select box
 		const input = document.createElement("select");
 		
 		// format select box
-		input.id = convertToIdFormat(name + "-select");
+		//input.id = convertToIdFormat(name + "-select");
 		input.multiple = false;
 		
 		// add event listener
@@ -319,11 +337,11 @@ export class Scoresheet extends EventTarget {
 		
 		// format label
 		label.textContent = name + " ";
-		label.htmlFor = input.id;
+		//label.htmlFor = input.id;
 		
 		// push elements to container
+		label.appendChild(input);
 		container.appendChild(label);
-		container.appendChild(input);
 		
 		return this.constructObjectiveInfoTable(name, "dropdown", values, container, input);
 	}
@@ -335,7 +353,7 @@ export class Scoresheet extends EventTarget {
 		// create container
 		const container = document.createElement("div");
 		
-		container.id = convertToIdFormat(name + "-container");
+		//container.id = convertToIdFormat(name + "-container");
 		
 		// construct checkbox
 		const input = document.createElement("input");
@@ -347,17 +365,17 @@ export class Scoresheet extends EventTarget {
 		
 		// format input
 		input.type = "checkbox";
-		input.id = convertToIdFormat(name + "-checkbox");
+		//input.id = convertToIdFormat(name + "-checkbox");
 		
 		// construct label
 		const label = document.createElement("label");
 		
 		label.textContent = name + "? (" + value + " points) ";
-		label.htmlFor = input.id;
+		//label.htmlFor = input.id;
 		
 		// push elements to container
+		label.appendChild(input);
 		container.appendChild(label);
-		container.appendChild(input);
 		
 		return this.constructObjectiveInfoTable(name, "checkbox", value, container, input);
 	}
@@ -381,6 +399,77 @@ export class Scoresheet extends EventTarget {
 	}
 	
 	/**
+		*	@return the value currently in the objective, not the score of the objective
+		*
+		*	checkbox - true/false
+		*	number - number
+		*	dropdown - number
+	*/
+	getObjectiveInputState(objective){
+		// get input element
+		const inputElement = this.getObjectiveInputElement(objective);
+		
+		// get type
+		const type = objective.type;
+		
+		let state = null;
+		
+		// return value based on type
+		switch(type){
+			case "checkbox": {
+				state = inputElement.checked;
+				
+				break;
+			}
+			case "number": {
+				// convert string state to integer
+				state = +inputElement.value;
+				
+				break;
+			}
+			case "dropdown": {
+				state = inputElement.selectedIndex;
+				
+				break;
+			}
+		}
+		
+		return state;
+	}
+	
+	/**
+		*	set the value of an objective
+		*
+		*	@todo state validation
+	*/
+	setObjectiveInputState(objective, state){
+		// get input element
+		const inputElement = this.getObjectiveInputElement(objective);
+		
+		// get type
+		const type = objective.type;
+		
+		// assign value based on type
+		switch(type){
+			case "checkbox": {
+				inputElement.checked = state;
+				
+				break;
+			}
+			case "number": {
+				inputElement.value = state.toString();
+				
+				break;
+			}
+			case "dropdown": {
+				inputElement.selectedIndex = state;
+				
+				break;
+			}
+		}
+	}
+	
+	/**
 		*	@return the current score for an objective based on the value of its input
 	*/
 	getObjectiveScore(objective){
@@ -396,11 +485,13 @@ export class Scoresheet extends EventTarget {
 		// score value
 		let score = 0;
 		
+		let state = this.getObjectiveInputState(objective);
+		
 		// return value based on type
 		switch(type){
 			case "checkbox": {
 				// convert boolean state to integer
-				const state = +inputElement.checked;
+				state = +state;
 				
 				// apply to value
 				score = state * value;
@@ -408,18 +499,12 @@ export class Scoresheet extends EventTarget {
 				break;
 			}
 			case "number": {
-				// convert string state to integer
-				const state = +inputElement.value;
-				
 				// apply to value
 				score = state * value;
 			
 				break;
 			}
 			case "dropdown": {
-				// get index
-				const state = inputElement.selectedIndex;
-				
 				// apply to value
 				score = objective.value[state];
 			
@@ -447,6 +532,35 @@ export class Scoresheet extends EventTarget {
 		}
 		
 		return score;
+	}
+	
+	/**
+		*	@return the score + more detailed info about the quantity of each objective
+	*/
+	getScoreInfo(){
+		let scoreInfo = {
+			score: this.getScore(),
+			objectives: {}
+		};
+		
+		for(const objective of this.objectives){
+			scoreInfo.objectives[objective.name] = {
+				state: this.getObjectiveInputState(objective)
+			};
+		}
+		
+		return scoreInfo;
+	}
+	
+	setScoreFromScoreInfo(scoreInfo){	
+		// loop through each objective and assign value to input
+		for(const objectiveName of Object.keys(scoreInfo.objectives)){
+			const objective = this.objectives.filter(objective => objective.name === objectiveName)[0];
+			
+			const state = scoreInfo.objectives[objectiveName].state;
+			
+			this.setObjectiveInputState(objective, state);
+		}
 	}
 	
 	/**
