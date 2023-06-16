@@ -1,5 +1,6 @@
 {
 	"/": "index.html",
 	"/scoring": "scoring.html",
-	"/display": "display.html"
+	"/display": "display.html",
+	"/settings": "settings.html"
 }

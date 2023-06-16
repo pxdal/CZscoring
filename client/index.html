@@ -2,34 +2,19 @@
 <html>
 	<head>
 		<title>cz scoring</title>
-		<style>
-			a {
-				text-align: center;
-				display: block;
-				margin: 10px;
-			}
-			
-			p {
-				text-align: center;
-			}
-			
-			.center {
-				display: block;
-				margin-left: auto;
-				margin-right: auto;
-			}
-		</style>
+		<link rel="stylesheet" href="/static/css/default.css">
 	</head>
 	<body>
 		<div id="main-container" style="display: none">
 			<a href="/scoring">Scoring View</a>
 			<!-- <a href="/display">Audience View</a> -->
-			<img id="funny-picture" class="center" src="https://media4.giphy.com/media/voiiLWvpY2UZa/giphy.gif" title="the game was called cone zone when I started..."/>
+			<a href="/settings">Settings</a>
+			<img id="funny-picture" class="center"/>
 		</div>
 		
 		<p id="status">Checking if login is required...</p>
 		
-		<script type="text/javascript">
+		<script type ="text/javascript">
 			const funnyPictures = [
 				{
 					url: "https://i.gifer.com/JZWL.gif",
@@ -40,7 +25,7 @@
 					title: "the game was called cone zone when I started..."
 				},
 				{
-					url: "https://lh3.googleusercontent.com/rCOnilsrhmRp17mrgdGB2a80y46JSg4sAKaRHyIezCxhkcjB1aZqjStdgHDYxq6RrSRgBa9MqaAOtfDKGAfVmQL09qf9wI8o9muAmForlIHoO6A9NnIxoRLJo5MdyTvK4g=w1280",
+					url: "https://lh3.googleusercontent.com/WYPFCb-H8NgFASxl0fwdmWif43nNO4Mm1Y6j0yv9cRj7tvtsnQoGlpyWugHo8oAigsuHIvJH57w9K-TCbsB3zCcq6qfyHHFMSB-Ao2XdQBHgiAXShNURdJZxyMt-aqnfRQ=w1280",
 					title: "all alone...",
 					width: "480"
 				},
@@ -85,19 +70,29 @@
 				}
 			];
 			
-			window.addEventListener("load", e => {
-				// get elements
-				const mainContainer = document.getElementById("main-container");
-				const statusElement = document.getElementById("status");
+			function loadFunnyPicture(force){
 				const funnyPicture = document.getElementById("funny-picture");
 				
 				// randomize funny picture
-				const picData = funnyPictures[Math.floor(Math.random()*funnyPictures.length)];
+				const picData = force !== undefined ? funnyPictures[force] : funnyPictures[Math.floor(Math.random()*funnyPictures.length)];
 				
 				if(picData.url) funnyPicture.src = picData.url;
 				if(picData.title) funnyPicture.title = picData.title;
 				if(picData.width) funnyPicture.width = picData.width;
 				if(picData.height) funnyPicture.height = picData.height;
+			}
+		</script>
+		
+		<script type="text/javascript">
+			
+			
+			window.addEventListener("load", e => {
+				// get elements
+				const mainContainer = document.getElementById("main-container");
+				const statusElement = document.getElementById("status");
+				
+				// get funny picture (funny)
+				//loadFunnyPicture();
 				
 				// check if login is required
 				fetch("/tokenstatus")

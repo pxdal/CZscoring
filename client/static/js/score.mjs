@@ -552,7 +552,9 @@ export class Scoresheet extends EventTarget {
 		return scoreInfo;
 	}
 	
-	setScoreFromScoreInfo(scoreInfo){	
+	setScoreFromScoreInfo(scoreInfo){
+		if(!scoreInfo?.objectives) return;
+		
 		// loop through each objective and assign value to input
 		for(const objectiveName of Object.keys(scoreInfo.objectives)){
 			const objective = this.objectives.filter(objective => objective.name === objectiveName)[0];
@@ -579,7 +581,7 @@ export class Scoresheet extends EventTarget {
 		validateOptions(validatedOptions, options, [
 			{
 				name: "id",
-				required: true,
+				required: false,
 				types: ["string"]
 			},
 			{
@@ -602,7 +604,7 @@ export class Scoresheet extends EventTarget {
 		const domElement = document.createElement("div");
 		
 		// format div
-		domElement.id = id;
+		if(id) domElement.id = id;
 		
 		// split text
 		const textBits = text.split("{score}");

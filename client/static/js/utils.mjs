@@ -21,8 +21,6 @@ export function validateOptions(obj, options, optionDetails){
 	
 	const keys = Object.keys(options);
 	
-	obj.config = {};
-	
 	// loop through options and:
 	// 1. ensure all required options are present
 	// 2. add all options to this object
@@ -31,6 +29,8 @@ export function validateOptions(obj, options, optionDetails){
 		
 		const {name, required, defaultValue, types, valid, config} = opt;
 		
+		if(config && !obj.config) obj.config = {};
+
 		if(required && !keys.includes(name)){
 			throw new Error("Missing required parameter '" + name + "' in options object");
 		}

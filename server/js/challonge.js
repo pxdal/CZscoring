@@ -32,6 +32,17 @@ class ChallongeAPI {
 		"complete"
 	];
 	
+	static ALL_TOURNAMENT_STATE_CHANGES = [
+		'start',
+		'process_checkin',
+		'abort_checkin',
+		'finalize',
+		'reset',
+		'open_predictions',
+		'submit_for_review',
+		'start_group_stage',
+		'finalize_group_stage'
+	];
 	
 	// api tokens
 	accessToken = "";
@@ -62,6 +73,22 @@ class ChallongeAPI {
 				types: ["string"]
 			}
 		]);
+	}
+	
+	static isTournamentStateValid(state){
+		return ChallongeAPI.ALL_TOURNAMENT_STATES.includes(state);
+	}
+	
+	static isTournamentStateChangeValid(stateChange){
+		return ChallongeAPI.ALL_TOURNAMENT_STATE_CHANGES.includes(stateChange);
+	}
+	
+	static createParticipantData(name, uploadId){
+		return {
+			name: name,
+			uploadId: uploadId
+			// TODO: include real id? (upload id doesn't work with participant request)
+		};
 	}
 	
 	/**
@@ -213,6 +240,51 @@ class ChallongeAPI {
 		.catch(console.error);
 	}
 	
+	/**
+		*	@return a table containing advancement data (if they advance) for player 1 and player 2.
+		*
+		*	true means advancing, false means not advancing.  if both are false, the scores/sets were tied.  note that the challonge api doesn't seem capable of reporting ties properly, so a tie has to be declared a tie through challonge.  it's pretty dumb.
+	*/
+	determineAdvancement(sets){
+		let player1Wins = 0;
+		let player2Wins = 0;
+		
+		for(let i = 0; i < sets.length; i++){
+			const { scores } = sets[i];
+			const { player1, player2 } = scores;
+			
+			player1Wins += player1 > player2;
+			player2Wins += player2 > player1;
+		}
+		
+		return {
+			player1Advancing: player1Wins > player2Wins,
+			player2Advancing: player2Wins > player1Wins
+		};
+	}
+	
+	/**
+		*	@return a table of formatted strings from the set provided
+	*/
+	formatMatchSets(sets){
+		// format score sets
+		let player1Set = "";
+		let player2Set = "";
+		
+		for(let i = 0; i < sets.length; i++){
+			const { scores } = sets[i];
+			const { player1, player2 } = scores;
+			
+			player1Set += player1 + ",";
+			player2Set += player2 + ",";
+		}
+		
+		return {
+			player1Set: player1Set,
+			player2Set: player2Set
+		};
+	}
+	
 	// SPECIFIC API REQUESTS (all make requests to api) //
 	
 	/**
@@ -241,31 +313,36 @@ class ChallongeAPI {
 		for(let i = 0; i < included.length; i++){
 			const player = included[i];
 			
-			players["player"+(i+1)] = {
-				name: player.attributes.name,
-				uploadId: player.id
-				// TODO: include real id? (upload id doesn't work with participant request)
-			};
+			players["player"+(i+1)] = ChallongeAPI.createParticipantData(player.attributes.name, player.id);
 		}
 		
 		return players;
 	}
 	
 	/**
-		*	send a pair of scores to challonge
+		*	send a set of scores to challonge
 		*
-		*	scores:
-		* {
-		*		player1: {
-		*			uploadId: string,
-		*			score: string
-		*		}, player2: ...
+		*	info:
+		*	{
+		*		player1UploadId: string,
+		*		player2UploadId: string,
+		*		
+		*		scores:
+		*		[
+		*			{
+		*				player1: string,
+		*				player2: string
+		*			}, ...
+		*		]
 		*	}
 	*/
-	async sendScoresForMatch(tournamentId, matchId, scores){
-		// determines advancement (tied = both advance)
-		const player1Advancing = scores.player1.score > scores.player2.score;
-		const player2Advancing = scores.player2.score > scores.player1.score;
+	async sendScoresForMatch(tournamentId, matchId, info){
+		// get ids + set
+		const { player1UploadId, player2UploadId, scores } = info;
+		
+		// determines advancement (tied = neither advance)
+		const { player1Set, player2Set } = this.formatMatchSets(scores);
+		const { player1Advancing, player2Advancing } = this.determineAdvancement(scores);
 		
 		return this.apiRequest("/tournaments/" + tournamentId + "/matches/" + matchId + ".json", "PUT", {
 			data: {
@@ -273,13 +350,13 @@ class ChallongeAPI {
 				attributes: {
 					match: [
 						{
-							participant_id: scores.player1.uploadId,
-							score_set: scores.player1.score.toString(),
+							participant_id: player1UploadId,
+							score_set: player1Set,
 							advancing: player1Advancing
 						},
 						{
-							participant_id: scores.player2.uploadId,
-							score_set: scores.player2.score.toString(),
+							participant_id: player2UploadId,
+							score_set: player2Set,
 							advancing: player2Advancing
 						}
 					]
@@ -288,7 +365,25 @@ class ChallongeAPI {
 		});
 	}
 	
+	async changeTournamentState(tournamentId, state){
+		// validate tournament state
+		if(!ChallongeAPI.isTournamentStateChangeValid(state)) throw "invalid tournament state";
+		
+		return this.apiRequest("/tournaments/" + tournamentId + "/change_state.json", "PUT", {
+			"data": {
+				"type": "TournamentState",
+				"attributes": {
+					"state": state
+				}
+			}
+		});
+	}
+	
 	// DATA FILTER METHODS (filter data returned by api, sometimes making api requests as well) //
+	
+	getTournamentState(tournamentInfo){
+		return tournamentInfo.data.attributes.state;
+	}
 	
 	/**
 		*	@return an array of currently available matches from the tournament
@@ -352,10 +447,12 @@ class ChallongeTwoStageTournament {
 		*				uploadId: string
 		*			}, player2: ...
 		*		},
-		*		scores: {
-		*			player1: string,
-		*			player2: string
-		*		}
+		*		sets: [
+		*			{
+		*				scores: {},
+		*				scoreInfoCaches: {}
+		*			}, ...
+		*		]
 		* }
 		*
 		*	@note the challonge api does not give matches until the participants of those matches are known, so data has to be refetched every time a finals match is scored
@@ -388,17 +485,26 @@ class ChallongeTwoStageTournament {
 				types: ["ChallongeAPI"]
 			}
 		]);
-		
-		// delete config
-		delete this.config;
 	}
 	
+	/**
+		*	@return a table of match data from info given
+	*/
 	createMatchData(id, participants){
 		return {
 			id: id,
 			participants: participants,
-			scores: {},
-			scoreInfoCaches: {}
+			sets: [this.createSetData({}, {})] // create one set by default
+		};
+	}
+	
+	/**
+		*	@return a table of set data from info given
+	*/
+	createSetData(scores, scoreInfoCaches){
+		return {
+			scores: scores,
+			scoreInfoCaches: scoreInfoCaches
 		};
 	}
 	
@@ -442,7 +548,7 @@ class ChallongeTwoStageTournament {
 					
 					// cache names
 					for(let j = 0; j < Object.keys(participants).length; j++){
-						const participant = participants[Object.keys(participants)[i]];
+						const participant = participants[Object.keys(participants)[j]];
 						const id = participant.uploadId;
 						
 						this.addToParticipantData(id, "name", participant.name);
@@ -451,10 +557,7 @@ class ChallongeTwoStageTournament {
 					// no need to continue, all participants are fetched as a result of the api request
 					break;
 				} else {
-					participants[participantKey] = {
-						name: cachedName,
-						id: participantId
-					};
+					participants[participantKey] = ChallongeAPI.createParticipantData(cachedName, participantId);
 				}
 			}
 			
@@ -465,8 +568,13 @@ class ChallongeTwoStageTournament {
 		this.hasData = true;
 	}
 	
+	resetMatchCache(){
+		// forces ignore cache on next fetch
+		this.hasData = false;
+	}
+	
 	/**
-		*	@note we use participant data to cache certain features that we don't want to waste api requests on, such as the participant's name.  these are always cached by the upload id of the participant.  this creates some weird problems with final stage matches because they use the right id (challonge api sucks), but it's not a huge deal
+		*	@note we use participant data to cache certain features that we don't want to waste api requests on, such as the participant's name.  these are always cached by the upload id of the participant.  this creates some weird problems with final stage matches because they use the right id (challonge api sucks), but it doesn't affect much outside of load times for final matches (but it's slight)
 	*/
 	getParticipantData(uploadId, key){
 		if(!this.participantData[uploadId]) return undefined;
@@ -480,34 +588,56 @@ class ChallongeTwoStageTournament {
 		this.participantData[uploadId][key] = data;
 	}
 	
-	setMatchScore(matchIndex, player, scoreInfo){
+	setMatchScore(matchIndex, setIndex, player, scoreInfo){
 		// get match
 		const match = this.matches[matchIndex];
+		
+		// get set
+		const set = match.sets[setIndex] ?? (() => {
+			// if set doesn't exist, create it
+			match.sets[setIndex] = this.createSetData({}, {});
+			
+			return match.sets[setIndex];
+		})();
 		
 		// extract score
 		const score = scoreInfo.score;
 		
 		// save score
-		match.scores["player" + player] = score;
+		set.scores["player" + player] = score;
 		
 		// save score information
-		match.scoreInfoCaches["player" + player] = scoreInfo;
+		set.scoreInfoCaches["player" + player] = scoreInfo;
 		
 		// check if enough scores are available to send to challonge
 		// TODO: rate limit/check if score is unique
-		if(Object.keys(match.scores).length > 1){
+		if(Object.keys(set.scores).length > 1){
 			// send scores to challonge
-			this.api.sendScoresForMatch(this.id, match.id, {
-				player1: {
-					uploadId: match.participants.player1.uploadId,
-					score: match.scores.player1
-				},
-				player2: {
-					uploadId: match.participants.player2.uploadId,
-					score: match.scores.player2
-				}
-			}).catch(console.error);
+			this.sendMatchScoresToChallonge(matchIndex);
 		}
+	}
+	
+	sendMatchScoresToChallonge(matchIndex){
+		const match = this.matches[matchIndex];
+		
+		// send scores to challonge
+		this.api.sendScoresForMatch(this.id, match.id, {
+			player1UploadId: match.participants.player1.uploadId,
+			player2UploadId: match.participants.player2.uploadId,
+			
+			scores: match.sets
+		}).catch(console.error);
+	}
+	
+	removeLastMatchSet(matchIndex){
+		// get match
+		const match = this.matches[matchIndex];
+		
+		// remove last set
+		match.sets.splice(match.sets.length - 1, 1);
+		
+		// notify challonge of change
+		this.sendMatchScoresToChallonge(matchIndex);
 	}
 };
 

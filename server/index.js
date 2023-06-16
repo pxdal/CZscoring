@@ -90,12 +90,26 @@ const websocketEvents = {
 	
 	/**
 	*/
-	sendMatchScore: function(socket, match, player, scoreInfo){
+	sendMatchScore: function(socket, match, set, player, scoreInfo){
 		// format properly from clientside (indexes matches at 1)
 		match -= 1;
 		
 		// set match score in tournament manager
-		tournamentManager.setMatchScore(match, player, scoreInfo);
+		tournamentManager.setMatchScore(match, set, player, scoreInfo);
+	},
+	
+	/**
+		*	removes the last set from a match
+		*
+		*	@note this exists because of the "Remove Last Set" button on the client.  while adding a score set is inherently reported to the server when the scores for the new set are reported, removing a set is never reported to the server through sending scores, so it has to be done through its own request.
+		*
+		*	@note this can only remove the last set and not any particular set because it makes things easier for me.
+	*/
+	removeLastMatchSet: function(socket, match){
+		// format match properly from clientside (indexes matches at 1)
+		match -= 1;
+		
+		tournamentManager.removeLastMatchSet(match);
 	}
 };
 
@@ -155,20 +169,38 @@ app.get("/accesstoken", (req, res) => {
 	res.send(challongeClient.accessToken);
 });
 
-app.get("/tournamentinfo", (req, res) => {
+app.get("/tournamentstate", (req, res) => {
 	// check if token is available
-	if(!challongeClient.hasAccessToken()){
-		// send error
-		res.status(401).send("login via oauth required");
-
-		return;
-	}
+	if(!checkForAccessToken(res)) return;
 
 	challongeClient.getRawTournamentInfo(tournamentId)
 		.then(r => {
-			res.send(r);
+			res.send({
+				state: challongeClient.getTournamentState(r)
+			});
 		})
 		.catch(console.error);
+});
+
+app.use(express.json());
+
+app.put("/tournamentstate", (req, res) => {
+	// check if token is available
+	if(!checkForAccessToken(res)) return;
+	
+	const state = req.body.state;
+	
+	// change state
+	challongeClient.changeTournamentState(tournamentId, state)
+		.then(e => {
+			// reset match cache on all successful state changes
+			tournamentManager.resetMatchCache();
+			
+			res.send(JSON.stringify(e));
+		})
+		.catch(e => {
+			sendError(res, e);
+		});	
 });
 
 // websocket requests/responses...
@@ -188,3 +220,23 @@ io.on("connection", socket => {
 server.listen(port, () => {
 	console.log("online. url: http://localhost:" + port);
 });
+
+// utils
+function sendSuccess(res, message="success"){
+	res.send(`{ "status": "${message}" }`);
+}
+
+function sendError(res, error, status=400){
+	res.status(status).send(`{ "error": "${error}" }`);
+}
+
+function checkForAccessToken(res){
+	if(!challongeClient.hasAccessToken()){
+		// send error
+		sendError(res, "login via oauth required", 401);
+		
+		return false;
+	}
+	
+	return true;
+}

@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>Settings</title>
+		<link rel="stylesheet" href="/static/css/default.css">
+		
+		<script src="/socket.io/socket.io.js"></script>
+	</head>
+	<body>
+		<p>Please only mess with these if you know what you're doing...</p>
+		<!-- todo: should it update live? -->
+		<p>NOTE: This page does not update live.  Refresh the page for latest tournament state.</p>
+		<p id="tournament-state">Tournament is...</p>
+		<a href="javascript:void(0)" id="stage-switcher">Loading...</a>
+		<p><br/>DEBUGGING</p>
+		<a href="javascript:void(0)" id="randomize-scores">Give Everyone Random Scores</a>
+		
+		<script type="text/javascript">
+			// changes tournament state, reloads when done
+			function changeTournamentState(state){
+				fetch("/tournamentstate", {
+					method: "PUT",
+					headers: {
+						"Content-Type": "application/json"
+					},
+					body: JSON.stringify({
+						state: state
+					})
+				}).then(e => e.json())
+					.then(res => {
+						if(res.status === "500"){
+							alert("There was an error switching the tournament state.  You probably haven't finished scoring yet.");
+							return;
+						}
+						
+						location.reload();
+					})
+					.catch(console.error);
+			}
+		</script>
+		
+		<script type="text/javascript">
+			const tournamentState = document.getElementById("tournament-state");
+			const stageSwitcher = document.getElementById("stage-switcher");
+			
+			const switcherStates = {
+				"pending": {
+					stateText: "Not Started",
+					switcherText: "Start Group Stage",
+					onClick: () => {
+						changeTournamentState("start_group_stage");
+					}
+				},
+				
+				"group_stages_underway": {
+					stateText: "In Group Stage",
+					switcherText: "End Group Stage",
+					onClick: () => {
+						changeTournamentState("finalize_group_stage");
+					}
+				},
+				
+				"group_stages_finalized": {
+					stateText: "Awaiting Final Stage",
+					switcherText: "Start Final Stage",
+					onClick: () => {
+						changeTournamentState("start");
+					}
+				},
+				
+				"underway": {
+					stateText: "In Final Stage"
+				},
+				
+				"awaiting_review": {
+					stateText: "Scores Awaiting Review"
+				},
+				
+				"complete": {
+					stateText: "Complete"
+				}
+			};
+			
+			// request current tournament state from server
+			fetch("/tournamentstate")
+				.then(res => res.json())
+				.then(json => {
+					// get state
+					const { state } = json;
+					
+					// set stage switcher based on state
+					const switcherState = switcherStates[state];
+					
+					tournamentState.innerHTML += "<b>" + (switcherState?.stateText ?? "Unknown Stage") + "</b>";
+					
+					if(switcherState?.switcherText){
+						stageSwitcher.innerText = switcherState.switcherText;
+						stageSwitcher.addEventListener("click", switcherState.onClick);
+					} else {
+						// hide switcher
+						stageSwitcher.style.display = "none";
+					}
+				});
+		</script>
+		
+		<script type="module">
+			// NOTE: this whole script is cheesy and stupid, but it's also a debugging thing that I'm going to remove so it doesn't really matter
+			
+			const socket = io();
+			
+			const randomizeScores = document.getElementById("randomize-scores");
+			
+			randomizeScores.addEventListener("click", e => {
+				socket.emit("getTournamentInfo");
+			});
+			
+			socket.on("receiveTournamentInfo", matches => {
+				for(let i = 1; i <= matches.length; i++){
+					let score;
+					
+					for(let j = 1; j <= 2; j++){
+						if(j === 1){
+							score = getRandomScore();
+						} else {
+							// prevent ties
+							let old = score;
+							
+							while(score === old){
+								score = getRandomScore();
+							}
+						}
+						
+						socket.emit("sendMatchScore", i, 0, j, { score: score });
+					}
+				}
+				
+				alert("Done");
+			});
+			
+			function getRandomScore(){
+				return Math.floor(Math.random() * 132) + 14;
+			}
+		</script>
+	</body>
+</html>
