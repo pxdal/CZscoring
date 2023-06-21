@@ -25,9 +25,9 @@
 					title: "the game was called cone zone when I started..."
 				},
 				{
-					url: "https://lh3.googleusercontent.com/WYPFCb-H8NgFASxl0fwdmWif43nNO4Mm1Y6j0yv9cRj7tvtsnQoGlpyWugHo8oAigsuHIvJH57w9K-TCbsB3zCcq6qfyHHFMSB-Ao2XdQBHgiAXShNURdJZxyMt-aqnfRQ=w1280",
+					url: "https://cdn.discordapp.com/attachments/1019731582812176416/1041466833355685970/IMG_2625.jpg",
 					title: "all alone...",
-					width: "480"
+					width: "400"
 				},
 				{
 					url: "https://media.discordapp.net/attachments/1075221727040258108/1082267713637990450/IMG_1714.png",
@@ -76,23 +76,38 @@
 				// randomize funny picture
 				const picData = force !== undefined ? funnyPictures[force] : funnyPictures[Math.floor(Math.random()*funnyPictures.length)];
 				
-				if(picData.url) funnyPicture.src = picData.url;
-				if(picData.title) funnyPicture.title = picData.title;
-				if(picData.width) funnyPicture.width = picData.width;
-				if(picData.height) funnyPicture.height = picData.height;
+				if(picData.url){
+					funnyPicture.src = picData.url;
+				}
+				
+				if(picData.title){
+					funnyPicture.title = picData.title;
+				} else {
+					funnyPicture.removeAttribute("title");
+				}
+				
+				if(picData.width){
+					funnyPicture.width = picData.width;
+				} else {
+					funnyPicture.removeAttribute("width");
+				}
+				
+				if(picData.height){
+					funnyPicture.height = picData.height;
+				} else {
+					funnyPicture.removeAttribute("height");
+				}
 			}
 		</script>
 		
-		<script type="text/javascript">
-			
-			
+		<script type="text/javascript">	
 			window.addEventListener("load", e => {
 				// get elements
 				const mainContainer = document.getElementById("main-container");
 				const statusElement = document.getElementById("status");
 				
 				// get funny picture (funny)
-				//loadFunnyPicture();
+				loadFunnyPicture();
 				
 				// check if login is required
 				fetch("/tokenstatus")

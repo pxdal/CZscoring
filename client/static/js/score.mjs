@@ -84,6 +84,11 @@ export class ScoresheetTemplate {
 	*	@brief A single scoresheet created from a template.  unlike the template, this creates an html ui for the scoresheet and can compute a score based on inputs to that ui.
 */
 export class Scoresheet extends EventTarget {
+	static ChangeCauses = {
+		INPUT: 0,
+		FROM_SCORE_INFO: 1
+	};
+	
 	// the template used to create this scoresheet
 	template;
 	
@@ -274,9 +279,11 @@ export class Scoresheet extends EventTarget {
 		input.type = "number";
 		//input.id = convertToIdFormat(name + "-input");
 		
+		input.value = 0;
+		
 		// add event listener
 		input.addEventListener("change", e => {
-			this.dispatchEvent(new Event("change"));
+			this.dispatchChange(Scoresheet.ChangeCauses.INPUT);
 		});
 		
 		// construct label
@@ -314,7 +321,7 @@ export class Scoresheet extends EventTarget {
 		
 		// add event listener
 		input.addEventListener("change", e => {
-			this.dispatchEvent(new Event("change"));
+			this.dispatchChange(Scoresheet.ChangeCauses.INPUT);
 		});
 		
 		// create options
@@ -360,7 +367,7 @@ export class Scoresheet extends EventTarget {
 		
 		// add event listener
 		input.addEventListener("change", e => {
-			this.dispatchEvent(new Event("change"));
+			this.dispatchChange(Scoresheet.ChangeCauses.INPUT);
 		});
 		
 		// format input
@@ -563,6 +570,17 @@ export class Scoresheet extends EventTarget {
 			
 			this.setObjectiveInputState(objective, state);
 		}
+		
+		// dispatch change event
+		this.dispatchChange(Scoresheet.ChangeCauses.FROM_SCORE_INFO);
+	}
+	
+	dispatchChange(cause){
+		const changeEvent = new Event("change");
+		
+		changeEvent.cause = cause;
+		
+		this.dispatchEvent(changeEvent);
 	}
 	
 	/**

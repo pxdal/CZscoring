@@ -7,13 +7,18 @@
 		<script src="/socket.io/socket.io.js"></script>
 	</head>
 	<body>
-		<p>Please only mess with these if you know what you're doing...</p>
-		<!-- todo: should it update live? -->
-		<p>NOTE: This page does not update live.  Refresh the page for latest tournament state.</p>
+		<p id="current-username">Your Username Is:</p>
+		<a href="javascript:void(0)" id="username-changer">Change Your Username</a>
+		
+		<br/>
+		<p><strong>⚠️ DANGER ZONE!! ⚠️</strong></p>
+		<p>Please only mess with the below settings if you know what you're doing</p>
+		
 		<p id="tournament-state">Tournament is...</p>
 		<a href="javascript:void(0)" id="stage-switcher">Loading...</a>
-		<p><br/>DEBUGGING</p>
-		<a href="javascript:void(0)" id="randomize-scores">Give Everyone Random Scores</a>
+		
+		<!-- <p><br/>DEBUGGING</p>
+		<a href="javascript:void(0)" id="randomize-scores">Give Everyone Random Scores</a> -->
 		
 		<script type="text/javascript">
 			// changes tournament state, reloads when done
@@ -106,39 +111,81 @@
 		<script type="module">
 			// NOTE: this whole script is cheesy and stupid, but it's also a debugging thing that I'm going to remove so it doesn't really matter
 			
-			const socket = io();
+			//const socket = io();
 			
 			const randomizeScores = document.getElementById("randomize-scores");
 			
-			randomizeScores.addEventListener("click", e => {
-				socket.emit("getTournamentInfo");
-			});
-			
-			socket.on("receiveTournamentInfo", matches => {
-				for(let i = 1; i <= matches.length; i++){
-					let score;
-					
-					for(let j = 1; j <= 2; j++){
-						if(j === 1){
-							score = getRandomScore();
-						} else {
-							// prevent ties
-							let old = score;
-							
-							while(score === old){
-								score = getRandomScore();
-							}
-						}
-						
-						socket.emit("sendMatchScore", i, 0, j, { score: score });
-					}
-				}
+			if(randomizeScores){
+				let wasButtonPressed = false;
 				
-				alert("Done");
-			});
+				randomizeScores.addEventListener("click", e => {
+					wasButtonPressed = true;
+					
+					socket.emit("getTournamentInfo");
+				});
+				
+				socket.on("receiveTournamentInfo", matches => {
+					if(!wasButtonPressed) return;
+					
+					wasButtonPressed = false;
+					
+					for(let i = 1; i <= matches.length; i++){
+						let score;
+						
+						for(let j = 1; j <= 2; j++){
+							if(j === 1){
+								score = getRandomScore();
+							} else {
+								// prevent ties
+								let old = score;
+								
+								while(score === old){
+									score = getRandomScore();
+								}
+							}
+							
+							socket.emit("sendMatchScore", i, 0, j, { score: score });
+						}
+					}
+					
+					alert("Done");
+				});
+			}
 			
 			function getRandomScore(){
 				return Math.floor(Math.random() * 132) + 14;
+			}
+		</script>
+		
+		<script type="module">
+			// imports
+			import { UsernameManager } from "/static/js/usernamemanager.mjs";
+			
+			// get elements
+			const currentUsername = document.getElementById("current-username");
+			const usernameChanger = document.getElementById("username-changer");
+			
+			const socket = io();
+			
+			// create manager
+			const usernameManager = new UsernameManager({
+				socket: socket
+			});
+			
+			usernameManager.addEventListener("usernamechanged", e => {
+				updateCurrentUsername();
+			});
+			
+			updateCurrentUsername();
+			
+			usernameChanger.addEventListener("click", e => {
+				usernameManager.promptForUsername();
+				
+				updateCurrentUsername();
+			});
+			
+			function updateCurrentUsername(){
+				currentUsername.innerHTML = "Your Username Is: <strong>" + usernameManager.getUsername() + "</strong>";
 			}
 		</script>
 	</body>

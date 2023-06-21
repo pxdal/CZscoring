@@ -305,7 +305,7 @@ class ChallongeAPI {
 	*/
 	async getMatchParticipantsById(tournamentId, matchId){
 		// get match data by request
-		const { included } = await this.apiRequest("/tournaments/"+tournamentId+"/matches/"+matchId);
+		const { included } = await this.apiRequest("/tournaments/"+tournamentId+"/matches/"+matchId+".json");
 		
 		// extract data
 		const players = {};
@@ -465,6 +465,13 @@ class ChallongeTwoStageTournament {
 	// don't write to this!
 	hasData = false;
 	
+	// amount of matches in group stage (determined through fetchData, if possible)
+	// this can be provided in the constructor, but determination through fetchData is attempted first and the provided count will only be used if that attempt fails
+	groupStateMatchCount = 0;
+	
+	// tournament state cached every time getTournamentState() or fetchData() is called.  if you know for certain that the tournament state hasn't changed since the last call to any of these functions, you can save a bit of time and an api request by using the cached state instead
+	cachedTournamentState = "";
+	
 	/**
 		*	{
 		*		id: string, // tournament id
@@ -483,6 +490,12 @@ class ChallongeTwoStageTournament {
 				name: "api",
 				required: true,
 				types: ["ChallongeAPI"]
+			},
+			{
+				name: "groupStageMatchCount",
+				required: false,
+				types: ["number"],
+				default: 0
 			}
 		]);
 	}
@@ -490,12 +503,19 @@ class ChallongeTwoStageTournament {
 	/**
 		*	@return a table of match data from info given
 	*/
-	createMatchData(id, participants){
+	createMatchData(id, participants, state){
 		return {
 			id: id,
 			participants: participants,
+			state: state,
 			sets: [this.createSetData({}, {})] // create one set by default
 		};
+	}
+	
+	copyMatchData(match, id, participants, state){
+		match.id = id;
+		match.participants = participants;
+		match.state = state;
 	}
 	
 	/**
@@ -508,22 +528,58 @@ class ChallongeTwoStageTournament {
 		};
 	}
 	
+	async getTournamentState(){
+		const state = await this.api.getRawTournamentInfo(this.id).then(info => this.api.getTournamentState(info));
+		
+		// cache tournament state
+		this.cachedTournamentState = state;
+		
+		return state;
+	}
+	
+	getCachedTournamentState(){
+		return this.cachedTournamentState;
+	}
+	
+	getCachedMatchAtId(id){
+		return this.matches.find(match => match.id === id);
+	}
+	
 	/**
 		*	@brief fetches fresh tournament data using the id and the api interface provided.
+		*
+		*	@param cullGroupStageMatches should we exclude group stage matches (if count is known)?
+		*	@param noOverwrite if true, cached scores + score info won't be deleted (unless culled in group stage)
 	*/
-	async fetchData(){
+	async fetchData(cullGroupStageMatches, noScoreOverwrite){
 		// check if api is good
 		if(!this.api || !this.api.hasAccessToken()){
 			throw new Error("api is missing required credentials");
 		}
 		
 		// clear the match array
-		this.matches = [];
+		if(!noScoreOverwrite) this.matches = [];
 		
-		// fetch matches
+		// get raw tournament info
 		const rawTournamentInfo = await this.api.getRawTournamentInfo(this.id);
 		
-		const matchList = this.api.getRawTournamentMatches(rawTournamentInfo);
+		// get state
+		const state = this.api.getTournamentState(rawTournamentInfo);
+		
+		// cache tournament state
+		this.cachedTournamentState = state;
+		
+		// get matches
+		let matchList = this.api.getRawTournamentMatches(rawTournamentInfo);
+		
+		// cache group stage match count, if possible, and cull group stage matches if requested
+		if(state === "group_stages_underway" || state === "group_stages_finalized"){
+			// cache match count
+			this.groupStageMatchCount = matchList.length;
+		} else if(cullGroupStageMatches){
+			// cull group stage matches
+			matchList = matchList.slice(this.groupStageMatchCount);
+		}
 		
 		// iterate through each match and filter data to add to match array
 		for(const match of matchList){
@@ -561,7 +617,22 @@ class ChallongeTwoStageTournament {
 				}
 			}
 			
-			this.matches.push(this.createMatchData(matchId, participants));
+			// save old score sets if necessary
+			const cachedMatch = this.getCachedMatchAtId(matchId);
+				
+			if(noScoreOverwrite && cachedMatch){
+				// copy new data
+				this.copyMatchData(cachedMatch, matchId, participants, state);
+			} else {
+				// create match data
+				const newMatchData = this.createMatchData(matchId, participants, state);
+			
+				this.matches.push(newMatchData);
+			}
+		}
+		
+		if(cullGroupStageMatches && matchList.length !== this.matches.length){
+			this.matches.splice(0, this.groupStageMatchCount);
 		}
 		
 		// indicate that data is available
@@ -588,7 +659,7 @@ class ChallongeTwoStageTournament {
 		this.participantData[uploadId][key] = data;
 	}
 	
-	setMatchScore(matchIndex, setIndex, player, scoreInfo){
+	getMatchSet(matchIndex, setIndex){
 		// get match
 		const match = this.matches[matchIndex];
 		
@@ -600,24 +671,22 @@ class ChallongeTwoStageTournament {
 			return match.sets[setIndex];
 		})();
 		
-		// extract score
-		const score = scoreInfo.score;
-		
-		// save score
-		set.scores["player" + player] = score;
-		
-		// save score information
-		set.scoreInfoCaches["player" + player] = scoreInfo;
+		return set;
+	}
+	
+	setMatchScore(matchIndex, setIndex, player, scoreInfo){
+		const scoresAvailable = this.saveScoreInfo(matchIndex, setIndex, player, scoreInfo);
 		
 		// check if enough scores are available to send to challonge
 		// TODO: rate limit/check if score is unique
-		if(Object.keys(set.scores).length > 1){
+		if(scoresAvailable > 1){
 			// send scores to challonge
 			this.sendMatchScoresToChallonge(matchIndex);
 		}
 	}
 	
 	sendMatchScoresToChallonge(matchIndex){
+		// get match
 		const match = this.matches[matchIndex];
 		
 		// send scores to challonge
@@ -629,6 +698,14 @@ class ChallongeTwoStageTournament {
 		}).catch(console.error);
 	}
 	
+	addMatchSet(matchIndex){
+		// get match
+		const match = this.matches[matchIndex];
+		
+		// add a set
+		match.sets.push(this.createSetData({}, {}));
+	}
+	
 	removeLastMatchSet(matchIndex){
 		// get match
 		const match = this.matches[matchIndex];
@@ -638,6 +715,21 @@ class ChallongeTwoStageTournament {
 		
 		// notify challonge of change
 		this.sendMatchScoresToChallonge(matchIndex);
+	}
+
+	saveScoreInfo(matchIndex, setIndex, player, scoreInfo){
+		const set = this.getMatchSet(matchIndex, setIndex);
+		
+		// extract score
+		const score = scoreInfo.score;
+		
+		// save score
+		set.scores["player" + player] = score;
+		
+		// save score information
+		set.scoreInfoCaches["player" + player] = scoreInfo;
+
+		return Object.keys(set.scores).length;
 	}
 };
 

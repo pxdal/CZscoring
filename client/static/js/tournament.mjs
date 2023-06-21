@@ -35,7 +35,7 @@ export class TournamentManager {
 	scoresheetElements = [];
 	
 	// current match, used to display the correct scoresheet + header.  indexed at 1
-	currentMatch = 0;
+	currentMatch = 1;
 	
 	// all matches (in same format as received from server)
 	matches = [];
@@ -49,29 +49,66 @@ export class TournamentManager {
 			console.log("[server ---> client] took " + (curTime.valueOf() - time) + "ms");
 		},
 		
-		receiveTournamentInfo: function(matches){
-			// save matches
-			this.matches = matches;
+		/**
+			*	if keepScoreInfo is true, scoresheets + scoresheetElements are only created for new matches.  this only works properly if new matches are after old matches, otherwise the order of everything gets screwed up
+		*/
+		receiveTournamentInfo: function(matches, keepScoreInfo){
+			// get new matches
+			let newMatches = [];
 			
-			console.log(matches);
-		
+			if(!keepScoreInfo){
+				newMatches = matches;
+				
+				// empty matches
+				this.matches = [];
+				
+				// empty scoresheets if clearing scores
+				// TODO: should finish writing reset() so that this is less stupid?
+				this.scoresheets = [];
+				this.scoresheetElements = [];
+			} else {
+				// new match = any match with unique id
+				// this is probably pretty slow but it definitely doesn't matter
+				newMatches = matches.filter(match => {
+					return this.matches.findIndex(m => match.id === m.id) === -1;
+				});
+			}
+			
+			console.log(matches.slice());
+			console.log(newMatches.slice());
+			
+			// save currently selected match
+			const cm = this.currentMatch;
+			
 			// get scoresheet container
 			const scoresheetContainer = this.getScoresheetContainer();
 			
 			// delete loading text
 			scoresheetContainer.textContent = "";
 			
+			// clear match selector
+			if(!keepScoreInfo) this.getMatchSelector().textContent = "";
+			
 			// create scoresheets
-			for(let j = 0; j < this.matches.length; j++){
-				const match = this.matches[j];
+			for(let j = 0; j < newMatches.length; j++){
+				const match = newMatches[j];
 				
 				// extract match data
 				const { participants, sets } = match;
 				
+				// check if there's enough participants
+				if(Object.keys(participants).length < 2){
+					// remove match
+					newMatches.splice(j, 1);
+					j--;
+					
+					continue;
+				}
+				
 				// add option to match selector
 				const matchOption = document.createElement("option");
 				
-				matchOption.textContent = "Match " + (j+1);
+				matchOption.textContent = "Match " + (j + this.matches.length +1);
 				
 				this.getMatchSelector().appendChild(matchOption);
 				
@@ -80,8 +117,8 @@ export class TournamentManager {
 				let scoresheetElementSet = [];
 				
 				// create one set of scoresheets per match set
-				for(let k = 0; k < sets.length; k++){
-					const { scoreInfoCaches } = sets[k];
+				for(const set of sets){
+					const { scoreInfoCaches } = set;
 					
 					// create one scoresheet per participant
 					for(let i = 0; i < Object.keys(participants).length; i++){
@@ -100,22 +137,96 @@ export class TournamentManager {
 						// push to element set
 						scoresheetElementSet.push(container);
 					}
-					
-					this.scoresheets.push(scoresheetSet);
-					this.scoresheetElements.push(scoresheetElementSet);
 				}
+				
+				// push completed sets
+				this.scoresheets.push(scoresheetSet);
+				this.scoresheetElements.push(scoresheetElementSet);
 			}
 			
-			// set match to 1 (start)
+			// add new matches to matches
+			this.matches.push(...newMatches);
+			
+			// set match
 			// also updates everything
-			this.setCurrentMatch(1);
+			this.setCurrentMatch(cm, true);
+		},
+	
+		addSet: function(match){
+			// save current match
+			const cm = this.currentMatch;
+			
+			// set current match to provided
+			this.setCurrentMatch(match, true);
+			
+			// add set
+			this.addSetToCurrentMatch(true);
+			
+			// set match back to old
+			this.setCurrentMatch(cm, true);
+		},
+		
+		removeLastMatchSet: function(match){
+			console.log(match);
+			
+			// save current match
+			const cm = this.currentMatch;
+			
+			// set current match to provided
+			this.setCurrentMatch(match, true);
+			
+			// remove last set
+			this.removeLastSetFromCurrentMatch(true);
+			
+			// set match back to old
+			this.setCurrentMatch(cm, true);
+		},
+		
+		sendScoreInfo: function(match, set, player, scoreInfo){
+			// format properly from server
+			// TODO: throughout this entire project there are undocumented and stupid differences between how the server and client manage data, and it was a terrible idea to not make it completely standard so that I'm not sitting here wondering why the alliances aren't lining up between clients.  I should probably fix it
+			player--;
+			
+			console.log(match + ", " + set + ", " + player);
+			console.log(scoreInfo);
+			console.log();
+			
+			// save current match + set selection
+			const cm = this.currentMatch;
+			const cs = this.getSelectedSetIndex();
+			const ca = this.getSelectedAllianceIndex();
+			
+			// swap to provided match
+			this.setCurrentMatch(match);
+			
+			// swap to set
+			this.getSetSelector().selectedIndex = set;
+			
+			// swap to alliance
+			this.getAllianceSelector().selectedIndex = player;
+			
+			// update scoresheet
+			this.getCurrentScoresheet().setScoreFromScoreInfo(scoreInfo);
+			
+			// revert
+			this.setCurrentMatch(cm);
+			
+			this.getSetSelector().selectedIndex = cs;
+			this.getAllianceSelector().selectedIndex = ca;
+			
+			this.loadScoresheet();
+		},
+		
+		/**
+			* this is used only for reloading the page on tournament state changes, only the server can cause it to happen
+		*/
+		refreshPage: function(){
+			location.reload();
 		}
 	};
 	
 	/**
-		*	Constructor options:
-		*	{ 	
-		*	}
+		*	
 	*/
 	constructor(options){
 		// validate options
@@ -124,11 +235,18 @@ export class TournamentManager {
 				name: "template",
 				required: true,
 				types: ["ScoresheetTemplate"]
+			},
+			{
+				name: "usernameManager",
+				required: true,
+				types: ["UsernameManager"]
+			},
+			{
+				name: "socket",
+				required: true,
+				types: ["Socket"]
 			}
 		]);
-		
-		// open websocket
-		this.socket = io();
 		
 		// set websocket events
 		for(const eventName of Object.keys(this.websocketEvents)){
@@ -142,6 +260,9 @@ export class TournamentManager {
 		
 		// tell server to cache info + give us match schedule
 		this.socket.emit("getTournamentInfo");
+		
+		// also give server our username
+		this.socket.emit("setUsername", this.usernameManager.getUsername());
 	}
 	
 	constructHTML(){
@@ -266,24 +387,10 @@ export class TournamentManager {
 		
 		// add a new set
 		addSetButton.addEventListener("click", e => {
-			// create two new scoresheets
-			for(let i = 0; i < 2; i++){
-				// create new scoresheet
-				const scoresheet = this.createScoresheet();
+			// tell server
+			this.socket.emit("addSet", this.currentMatch);
 			
-				// create new container + indicator
-				const container = this.createScoresheetContainer(scoresheet);
-				
-				// add to scoresheet set
-				this.getCurrentScoresheetSet().push(scoresheet);
-				
-				// add to scoresheet element set
-				this.getCurrentScoresheetElementSet().push(container);
-			}
-			
-			// update everything
-			// NOTE: this is required before the loadScoresheet below because it ensures that the proper number of set selector options are present before changing the selected index.  the proper selected index is required to load the right scoresheet, so it has to happen like this
-			this.update();
+			this.addSetToCurrentMatch();
 			
 			// advance to newly created set
 			const last = this.getCurrentSetCount() - 1;
@@ -291,6 +398,7 @@ export class TournamentManager {
 			this.getSetSelector().selectedIndex = last;
 			
 			// load correct scoresheet
+			// NOTE: this is required after the update above because it ensures that the proper number of set selector options are present before changing the selected index.  the proper selected index is required to load the right scoresheet, so it has to happen like this
 			this.loadScoresheet();
 		});
 		
@@ -299,17 +407,10 @@ export class TournamentManager {
 			// fail if there's only one set
 			if(this.getCurrentSetCount() <= 1) return;
 			
-			// remove last two scoresheets from each set
-			// TODO: kinda cheesy looking
-			this.getCurrentScoresheetSet().splice(this.getCurrentScoresheetSet().length - 2, 2);
+			// update server
+			this.socket.emit("removeLastMatchSet", this.currentMatch);
 			
-			this.getCurrentScoresheetElementSet().splice(this.getCurrentScoresheetElementSet().length - 2, 2);	
-			
-			// save selected index (gets modified by update() below)
-			const selectedSetIndex = this.getSelectedSetIndex();
-			
-			// update everything
-			this.update();
+			this.removeLastSetFromCurrentMatch();
 			
 			// move back one set if necessary, or stay on old selected set
 			if(selectedSetIndex === this.getCurrentSetCount()){
@@ -325,9 +426,6 @@ export class TournamentManager {
 			// load correct scoresheet
 			// NOTE: unlike addSetButton's double load, this is necessary because removing an option just defaults the selected index to 1 for some reason?  not sure if that's actually what's happening, but we need to load the correct scoresheet after changing the selected index following the update
 			this.loadScoresheet();
-			
-			// update server
-			this.socket.emit("removeLastMatchSet", this.currentMatch);
 		});
 		
 		// push everything to container
@@ -375,10 +473,19 @@ export class TournamentManager {
 	}
 	
 	createScoresheet(scoreInfo){
-		return new Scoresheet({
+		const scoresheet = new Scoresheet({
 			template: this.template,
 			scoreInfo: scoreInfo
 		});
+		
+		// update score info when updated
+		scoresheet.addEventListener("change", e => {
+			const { cause } = e;
+			
+			if(cause === Scoresheet.ChangeCauses.INPUT) this.sendCurrentScoreInfoToServer();
+		});
+		
+		return scoresheet;
 	}
 	
 	createScoreIndicator(scoresheet){
@@ -408,13 +515,13 @@ export class TournamentManager {
 		return container;
 	}
 	
-	setCurrentMatch(num){
+	setCurrentMatch(num, saveUserSelection){
 		if(typeof num !== "number" || num < 1 || num > this.matches.length) return;
 		
 		this.currentMatch = num;
 		
 		// update
-		this.update();
+		this.update(saveUserSelection);
 	}
 	
 	incrementCurrentMatch(){
@@ -426,7 +533,41 @@ export class TournamentManager {
 	}
 	
 	/**
-		*	@return the h1 element used to display the match number
+		*	adds a new set to current match
+	*/
+	addSetToCurrentMatch(saveUserSelection){
+		// create two new scoresheets
+		for(let i = 0; i < 2; i++){
+			// create new scoresheet
+			const scoresheet = this.createScoresheet();
+		
+			// create new container + indicator
+			const container = this.createScoresheetContainer(scoresheet);
+			
+			// add to scoresheet set
+			this.getCurrentScoresheetSet().push(scoresheet);
+			
+			// add to scoresheet element set
+			this.getCurrentScoresheetElementSet().push(container);
+		}
+		
+		// update everything
+		this.update(saveUserSelection);
+	}
+	
+	removeLastSetFromCurrentMatch(saveUserSelection){
+		// remove last two scoresheets from each set
+		// TODO: kinda cheesy looking
+		this.getCurrentScoresheetSet().splice(this.getCurrentScoresheetSet().length - 2, 2);
+		
+		this.getCurrentScoresheetElementSet().splice(this.getCurrentScoresheetElementSet().length - 2, 2);
+
+		// update everything
+		this.update(saveUserSelection);
+	}
+	
+	/**
+		*	@return the <h1> element used to display the match number
 	*/
 	getMatchNumberHeader(){
 		return this.matchHeader.children[0].children[1];
@@ -557,7 +698,7 @@ export class TournamentManager {
 	}
 	
 	/**
-		* Update the h1 element used to display the match number with the correct number
+		* Update the <h1> element used to display the match number with the correct number
 		*
 		*	@todo validate current match?
 	*/
@@ -566,7 +707,7 @@ export class TournamentManager {
 	}
 	
 	/**
-		*	Update the select element used to select the team being scored with the correct opponents
+		*	Update the <select> element used to select the team being scored with the correct opponents
 	*/
 	updateMatchOpponents(){
 		const match = this.getCurrentMatch();
@@ -586,9 +727,12 @@ export class TournamentManager {
 	}
 	
 	/**
-		*	Updates the set selector based on the number of scoresheets in the set
+		*	Updates the <select> set selector based on the number of scoresheets in the set
 	*/
-	updateSetSelector(){
+	updateSetSelector(saveSet){
+		// save selected set
+		const selectedSet = this.getSetSelector().selectedIndex;
+		
 		// clear set selector
 		this.getSetSelector().textContent = "";
 		
@@ -606,17 +750,22 @@ export class TournamentManager {
 			// add option to set selector
 			this.getSetSelector().appendChild(setOption);
 		}
+		
+		// save set if applicable
+		if(saveSet && selectedSet > -1 && selectedSet < this.getSetSelector().length){
+			this.getSetSelector().selectedIndex = selectedSet;
+		}
 	}
 	
 	/**
 		*	Updates the match header based on the current match
 	*/
-	updateMatchHeader(){
+	updateMatchHeader(saveUserSelection){
 		// update match selector
 		this.getMatchSelector().selectedIndex = this.currentMatch-1;
 		
 		// update set selector
-		this.updateSetSelector();
+		this.updateSetSelector(saveUserSelection);
 		
 		// update number
 		this.updateMatchNumber();
@@ -632,6 +781,10 @@ export class TournamentManager {
 	*/
 	sendCurrentScoreToChallonge(){
 		this.socket.emit("sendMatchScore", this.currentMatch, this.getSelectedSetIndex(), this.getSelectedAllianceIndex()+1, this.getCurrentScoresheetScoreInfo());
+	}
+	
+	sendCurrentScoreInfoToServer(){
+		this.socket.emit("sendScoreInfo", this.currentMatch, this.getSelectedSetIndex(), this.getSelectedAllianceIndex()+1, this.getCurrentScoresheetScoreInfo());
 	}
 	
 	/**
@@ -672,9 +825,9 @@ export class TournamentManager {
 	/**
 		*	update entire manager
 	*/
-	update(){
+	update(saveUserSelection){
 		// update match header
-		this.updateMatchHeader();
+		this.updateMatchHeader(saveUserSelection);
 		
 		// load correct scoresheet
 		this.loadScoresheet();

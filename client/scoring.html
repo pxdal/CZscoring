@@ -9,27 +9,22 @@
 		<script type="module">
 			import { Scoresheet } from "/static/js/score.mjs";
 			import { TournamentManager } from "/static/js/tournament.mjs";
-			import { ballblast } from "/static/js/games/ballblast.mjs";
+			import { UsernameManager } from "/static/js/usernamemanager.mjs";
+			import { CURRENT_GAME } from "/static/js/games/currentgame.mjs";
 			
-			/*const scoresheet = new Scoresheet(ballblast);
-			
-			document.body.appendChild(scoresheet.domElement);
-			
-			const indicator = scoresheet.createScoreIndicator({
-				id: "main-indicator",
-				text: "Score: {score}",
-				autoupdate: true
+			// open websocket
+			const socket = io();
+		
+			// create username manager (prompts for username and halts until one is received)
+			const usernameManager = new UsernameManager({
+				socket: socket
 			});
-			
-			indicator.domElement.style["margin-top"] = "8px";
-			
-			// append indicator
-			document.body.appendChild(indicator.domElement);
-			*/
 			
 			// create tournament manager
 			const tourneyManager = new TournamentManager({
-				template: ballblast
+				template: CURRENT_GAME,
+				usernameManager: usernameManager,
+				socket: socket
 			});
 			
 			// append dom element

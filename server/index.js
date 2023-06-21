@@ -1,4 +1,5 @@
 // cz scoring host server (serves scoring pages, display pages, etc.)
+console.log("starting...");
 
 // GLOBALS //
 
@@ -9,6 +10,7 @@ const http = require("http");
 const path = require("path");
 const { readJsonFromFile, readJsonFromFileSync } = require("./js/json.js");
 const { ChallongeAPI, ChallongeTwoStageTournament } = require("./js/challonge.js");
+const ip = require("ip");
 
 // constants //
 
@@ -39,14 +41,16 @@ const server = http.createServer(app);
 // socket.io setup
 const io = new Server(server);
 
+// usernames already taken by other sockets
+const takenUsernames = [];
 
 // challonge setup
 
 // get options
-const { tournamentId, accessToken } = readJsonFromFileSync(optionsFile);
+const { tournamentId, groupStageMatchCount } = readJsonFromFileSync(optionsFile);
 
 // get challonge credentials
-const { clientId, clientSecret, redirectUri } = readJsonFromFileSync(credentialsFile);
+const { clientId, clientSecret, redirectUri, accessToken } = readJsonFromFileSync(credentialsFile);
 
 // create challonge api client
 const challongeClient = new ChallongeAPI({
@@ -59,7 +63,8 @@ const challongeClient = new ChallongeAPI({
 // create tournament manager
 const tournamentManager = new ChallongeTwoStageTournament({
 	id: tournamentId,
-	api: challongeClient
+	api: challongeClient,
+	groupStageMatchCount: groupStageMatchCount
 });
 
 // websocket events
@@ -70,32 +75,87 @@ const websocketEvents = {
 		socket.emit("pong", (new Date()).valueOf());
 	},
 
+	setUsername(socket, username){
+		const oldUsername = socket.username;
+		
+		if(username === oldUsername) return;
+		
+		// validate username
+		const err = validateUsername(username);
+		
+		if(err){
+			socket.emit("usernameStatus", err);
+			
+			return;
+		}
+		
+		// check that username isn't taken
+		if(takenUsernames.includes(username)){
+			socket.emit("usernameStatus", "Provided username was taken");
+		} else {
+			// remove old username from taken usernames
+			const oldUsernameIndex = takenUsernames.indexOf(oldUsername);
+			
+			if(oldUsernameIndex !== -1){
+				// remove
+				takenUsernames.splice(oldUsernameIndex, 1);
+			}
+		
+			// add new username to taken usernames
+			takenUsernames.push(username);
+			
+			// save username
+			socket.username = username;
+		}
+	},
+	
 	/**
 		*	fetch relevant tournament info, ignoring the cache and using the challonge api if requested or if there's no cache
 	*/
-	getTournamentInfo: function(socket, ignoreCache){
+	getTournamentInfo: function(socket, ignoreCache, keepScoreInfo){
 		new Promise( (resolve, reject) => {
-			// fetch straight through api
-			if(ignoreCache || !tournamentManager.hasData){
-				tournamentManager.fetchData().then(resolve);
-			} else {
-				resolve();
-			}
+			tournamentManager.getTournamentState()
+				.then(state => {
+					const cullGroupStage = state === "underway" || state === "awaiting_review";
+				
+					// fetch straight through api if applicable
+					if(ignoreCache || !tournamentManager.hasData){
+						tournamentManager.fetchData(cullGroupStage, true).then(resolve);
+					} else {
+						resolve();
+					}
+				});
 		})
 		.then(() => {
-			socket.emit("receiveTournamentInfo", tournamentManager.matches);
+			socket.emit("receiveTournamentInfo", tournamentManager.matches, keepScoreInfo);
 		})
 		.catch(console.error);
 	},
 	
-	/**
-	*/
 	sendMatchScore: function(socket, match, set, player, scoreInfo){
 		// format properly from clientside (indexes matches at 1)
 		match -= 1;
 		
 		// set match score in tournament manager
 		tournamentManager.setMatchScore(match, set, player, scoreInfo);
+		
+		// get cached tournament state
+		const state = tournamentManager.getCachedTournamentState();
+		
+		// if in final stage, attempt to refetch matches
+		if(state === "underway"){
+			websocketEvents.getTournamentInfo(io.sockets, true, true);
+		}
+	},
+	
+	/**
+		*	adds a set to a match
+	*/
+	addSet: function(socket, match){
+		tournamentManager.addMatchSet(match-1);
+		
+		// alert all clients of new set
+		socket.broadcast.emit("addSet", match);
 	},
 	
 	/**
@@ -107,9 +167,30 @@ const websocketEvents = {
 	*/
 	removeLastMatchSet: function(socket, match){
 		// format match properly from clientside (indexes matches at 1)
-		match -= 1;
+		tournamentManager.removeLastMatchSet(match-1);
 		
-		tournamentManager.removeLastMatchSet(match);
+		// alert all other sockets
+		socket.broadcast.emit("removeLastMatchSet", match);
+	},
+
+	/**
+		*	unlike sendMatchScore, this only saves the score information and doesn't involve any api requests.  this is used for live updates between scoring clients
+	*/
+	sendScoreInfo: function(socket, match, set, player, scoreInfo){
+		tournamentManager.saveScoreInfo(match-1, set, player, scoreInfo);
+		
+		socket.broadcast.emit("sendScoreInfo", match, set, player, scoreInfo);
+	},
+	
+	disconnect: function(socket){
+		// remove socket's username from taken usernames
+		const username = socket.username;
+		const usernameIndex = takenUsernames.indexOf(username);
+		
+		if(usernameIndex !== -1){
+			// remove
+			takenUsernames.splice(usernameIndex, 1);
+		}
 	}
 };
 
@@ -196,6 +277,9 @@ app.put("/tournamentstate", (req, res) => {
 			// reset match cache on all successful state changes
 			tournamentManager.resetMatchCache();
 			
+			// refresh all score pages
+			io.sockets.emit("refreshPage");
+			
 			res.send(JSON.stringify(e));
 		})
 		.catch(e => {
@@ -218,7 +302,32 @@ io.on("connection", socket => {
 
 // server listen
 server.listen(port, () => {
-	console.log("online. url: http://localhost:" + port);
+	let localAddress = "localhost";
+	let ipAddress = ip.address();
+	
+	if(port !== 80 && port !== 443){
+		localAddress += ":" + port;
+		ipAddress += ":" + port;
+	}
+	
+	// format spaces properly
+	const lengthDif = localAddress.length - ipAddress.length;
+	let spaces = "";
+	
+	for(let i = 0; i < Math.abs(lengthDif); i++) spaces += " ";
+	
+	let ls = "   ";
+	let is = "   ";
+	
+	if(lengthDif < 0){
+		ls += spaces;
+	} else {
+		is += spaces;
+	}
+	
+	// log
+	console.log("online.");
+	console.log("url: http://" + localAddress + ls + "for host (host = running this program)\n     http://" + ipAddress + is + "for devices other than host");
 });
 
 // utils
@@ -239,4 +348,13 @@ function checkForAccessToken(res){
 	}
 	
 	return true;
+}
+
+function validateUsername(username){
+	// check for whitespace
+	const whitespace = /\s/g;
+	
+	if(username.search(whitespace) !== -1) return "no whitespace allowed";
+	
+	return;
 }

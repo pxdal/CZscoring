@@ -4,16 +4,17 @@ significant changes between each commit will be written below to avoid clogging 
 
 # changes:
 
-- added sets, which allow scorers to send multiple sets of scores per match
-	- clientside: added a "set selector" which allows the scorer to add/remove sets, select sets, and scroll through sets with buttons
-	- serverside: matches now hold sets of scores instead of single scores, and the ChallongeAPI class' setMatchScores method uses a differently formatted parameter to accept sets of scores at a time
-- added settings page
-	- added setting to advance the tournament state
-		- added endpoint to get tournament state
-		- added endpoint to change tournament state (via PUT request)
-		- advancing the tournament state forces a match cache reload, so this should be used over using challonge to change the tournament state
-	- added setting to give everyone random scores (for debugging only)
-- added match selector dropdown to client to make skipping through matches easier than spamming a button
-- fixed bug where matches using cached participant names would have improperly formatted participant data, preventing scores from being uploaded to challonge
-- fixed bug where the serverside tournament manager would only cache the first participant of a match
-- ids aren't required for scoresheet indicators anymore (not sure why they ever were?)
+- scoresheets now update live between clients
+- scoresheet information is now saved on the server every time an objective is changed
+- group stage matches are no longer shown to scorers during the final stage
+- score page no longer shows matches with less than 2 participants
+- server now automatically refreshes match cache for itself and scoring clients every time a score is received during the final stage, which loads any matches without participants as soon as enough scores are available to have participants
+- added usernames (currently do nothing, but I plan to use them as indications for scorers)
+- updated server startup message
+- the number of matches in the group stage can (and should) now be provided in `options.json` through `"groupStageMatchCount"` key
+- sending scores now saves an api request by using a cached tournament state instead of requesting the tournament state from the api each time
+- added a built-in installation of node.js
+- added Ball Blast game
+- added batch files to make setting up and running the server a bit easier
+- updated README.md a ton
+- re-added funny pictures (very important)
