@@ -49,6 +49,10 @@ export class TournamentManager {
 			console.log("[server ---> client] took " + (curTime.valueOf() - time) + "ms");
 		},
 		
+		submissionStatus: function(message){
+			this.setSubmissionStatus(message, 2);
+		},
+		
 		/**
 			*	if keepScoreInfo is true, scoresheets + scoresheetElements are only created for new matches.  this only works properly if new matches are after old matches, otherwise the order of everything gets screwed up
 		*/
@@ -238,7 +242,7 @@ export class TournamentManager {
 			},
 			{
 				name: "usernameManager",
-				required: true,
+				required: false, // NOTE: temporarily false because I'm not using usernames right now
 				types: ["UsernameManager"]
 			},
 			{
@@ -262,7 +266,8 @@ export class TournamentManager {
 		this.socket.emit("getTournamentInfo");
 		
 		// also give server our username
-		this.socket.emit("setUsername", this.usernameManager.getUsername());
+		// NOTE: ditto
+		//this.socket.emit("setUsername", this.usernameManager.getUsername());
 	}
 	
 	constructHTML(){
@@ -375,6 +380,17 @@ export class TournamentManager {
 			this.loadScoresheet();
 		});
 		
+		// create set total counter
+		const totalSetCounterSpan = document.createElement("span");
+		const totalSetCounter = document.createElement("strong");
+		
+		// stylize
+		totalSetCounterSpan.textContent = "Total Sets: ";
+		totalSetCounter.textContent = "0";
+		
+		// push counter
+		totalSetCounterSpan.appendChild(totalSetCounter);
+		
 		// create set modifier buttons
 		const addSetButton = document.createElement("button");
 		const removeSetButton = document.createElement("button");
@@ -383,7 +399,7 @@ export class TournamentManager {
 		addSetButton.textContent = "Add New Set";
 		removeSetButton.textContent = "Remove Last Set";
 		
-		addSetButton.style["margin-left"] = "15px";
+		addSetButton.style["margin-left"] = "0px";
 		
 		// add a new set
 		addSetButton.addEventListener("click", e => {
@@ -429,7 +445,7 @@ export class TournamentManager {
 		});
 		
 		// push everything to container
-		appendChildren(setSelectorContainer, previousSetButton, setSelectorLabel, nextSetButton, addSetButton, removeSetButton);
+		appendChildren(setSelectorContainer, previousSetButton, setSelectorLabel, nextSetButton, totalSetCounterSpan, addSetButton, removeSetButton);
 		
 		// create alliance selector stuff
 		const allianceSelector = document.createElement("select");
@@ -460,16 +476,43 @@ export class TournamentManager {
 		this.domElement.appendChild(scoresheetContainer);
 		
 		// create submit button //
-		const submitButton = document.createElement("button");
+		const submissionContainer = document.createElement("div");
 		
-		submitButton.textContent = "Send Score to Challonge";
+		const submitButton = document.createElement("button");
+		const submissionStatus = document.createElement("span");
+		
+		submitButton.textContent = "Send Score To Server";
 		
 		submitButton.addEventListener("click", this.sendCurrentScoreToChallonge.bind(this));
 		
-		this.domElement.appendChild(submitButton);
+		appendChildren(submissionContainer, submitButton, submissionStatus);
 		
-		// update
-		//this.update();
+		this.domElement.appendChild(submissionContainer);
+		
+		/*
+		// create online box
+		const onlineBoxContainer = document.createElement("div");
+		
+		// stylize
+		onlineBox.style["border-style"] = "solid";
+		onlineBox.style["border-width"] = "1px";
+		onlineBox.style.width = "200px";
+		onlineBox.style.position = "absolute";
+		onlineBox.style.top = "20px";
+		onlineBox.style.right = "20px";
+		
+		// create title
+		const onlineBoxTitle = document.createElement("p");
+		
+		// stylize
+		onlineBoxTitle.innerHTML = "<strong>Online:</strong>";
+		onlineBoxTitle.style.margin = "10px";
+		
+		const onlineContainer = document.createElement("div");
+		
+		// stylize
+		onlineContainer.style.margin = "10px";
+		*/
 	}
 	
 	createScoresheet(scoreInfo){
@@ -588,6 +631,13 @@ export class TournamentManager {
 	}
 	
 	/**
+		*	@return the <strong> element (which is within a <span>) for the set counter
+	*/
+	getTotalSetCounter(){
+		return this.matchHeader.children[1].children[3].children[0];
+	}
+	
+	/**
 		*	@return the <select> element for the alliance selector
 	*/
 	getAllianceSelector(){
@@ -608,6 +658,35 @@ export class TournamentManager {
 	*/
 	getScoresheetContainer(){
 		return this.domElement.children[1];
+	}
+	
+	/**
+		*	@return the submission container (contains submission button and status)
+	*/
+	getSubmissionContainer(){
+		return this.domElement.children[2];
+	}
+	
+	/**
+		*	@return the <span> element used for displaying submission status
+	*/
+	getSubmissionStatusSpan(){
+		return this.getSubmissionContainer().children[1];
+	}
+	
+	/**
+		*	sets the submission status, for a certain amount of time in seconds (or indefinitely if not defined)
+	*/
+	setSubmissionStatus(status, expiration){
+		// add a space for cheap margin
+		this.getSubmissionStatusSpan().textContent = " " + status;
+		
+		// set timeout for expiration
+		if(expiration){
+			window.setTimeout(() => {
+				this.getSubmissionStatusSpan().textContent = "";
+			}, expiration*1000);
+		}
 	}
 	
 	/**
@@ -755,6 +834,9 @@ export class TournamentManager {
 		if(saveSet && selectedSet > -1 && selectedSet < this.getSetSelector().length){
 			this.getSetSelector().selectedIndex = selectedSet;
 		}
+		
+		// update total amount of sets
+		this.getTotalSetCounter().innerText = this.getSetSelector().length;
 	}
 	
 	/**
@@ -781,6 +863,8 @@ export class TournamentManager {
 	*/
 	sendCurrentScoreToChallonge(){
 		this.socket.emit("sendMatchScore", this.currentMatch, this.getSelectedSetIndex(), this.getSelectedAllianceIndex()+1, this.getCurrentScoresheetScoreInfo());
+		
+		this.setSubmissionStatus("Sending...");
 	}
 	
 	sendCurrentScoreInfoToServer(){

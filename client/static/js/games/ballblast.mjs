@@ -27,7 +27,7 @@ export const ballblast = new ScoresheetTemplate()
 		})
 	.createSection("End Game") // end game
 		.addObjective({
-			name: "Manual Blast",
+			name: "Cup Dunk (Manual Blast)",
 			type: "checkbox",
 			value: 25
 		})
@@ -50,10 +50,10 @@ export const ballblast = new ScoresheetTemplate()
 		})
 	.createSection("Penalties")
 		.addObjective({
-			name: "Minor Penalties",
-			value: -5
+			name: "Opposing Alliance Minor Penalties",
+			value: 5
 		})
 		.addObjective({
-			name: "Major Penalties",
-			value: -10
-		});
+			name: "Opposing Alliance Major Penalties",
+			value: 10
+		})

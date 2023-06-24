@@ -14,16 +14,16 @@
 			
 			// open websocket
 			const socket = io();
-		
+			
 			// create username manager (prompts for username and halts until one is received)
-			const usernameManager = new UsernameManager({
+			/*const usernameManager = new UsernameManager({
 				socket: socket
-			});
+			});*/
 			
 			// create tournament manager
 			const tourneyManager = new TournamentManager({
 				template: CURRENT_GAME,
-				usernameManager: usernameManager,
+				/*usernameManager: usernameManager,*/
 				socket: socket
 			});
 			

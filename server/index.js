@@ -146,6 +146,8 @@ const websocketEvents = {
 		if(state === "underway"){
 			websocketEvents.getTournamentInfo(io.sockets, true, true);
 		}
+		
+		socket.emit("submissionStatus", "Success");
 	},
 	
 	/**
@@ -274,11 +276,13 @@ app.put("/tournamentstate", (req, res) => {
 	// change state
 	challongeClient.changeTournamentState(tournamentId, state)
 		.then(e => {
-			// reset match cache on all successful state changes
-			tournamentManager.resetMatchCache();
-			
-			// refresh all score pages
-			io.sockets.emit("refreshPage");
+			if(!e.error){
+				// reset match cache on all successful state changes
+				tournamentManager.resetMatchCache();
+				
+				// refresh all score pages
+				io.sockets.emit("refreshPage");	
+			}
 			
 			res.send(JSON.stringify(e));
 		})
@@ -357,4 +361,8 @@ function validateUsername(username){
 	if(username.search(whitespace) !== -1) return "no whitespace allowed";
 	
 	return;
+}
+
+function log(username, action){
+	
 }

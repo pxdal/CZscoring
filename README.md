@@ -24,10 +24,6 @@ Each year, the Dartmouth High School Robotics Club hosts a micro-FTC game for mi
 
 note that the software can only manage one tournament at a time once it's running, and needs to be restarted any time `tournamentId` is changed.
 
-## repl installation
-
-**TODO: Write these instructions**
-
 # running
 
 ## running locally
@@ -54,10 +50,6 @@ at this point windows firewall will prompt you that it needs to communicate on p
 the software can then be used by navigation to the url provided and following instructions from there to log in to challonge via oauth.
 
 anyone who wants to access the online app can do so through the url provided.  the process of running the software only needs to be run once on one computer, which will allow anyone on the same wifi as that computer to access the web app.
-
-## running on repl
-
-**TODO: Write these instructions**
 
 # developer documentation
 

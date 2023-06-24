@@ -9,6 +9,7 @@
 			<a href="/scoring">Scoring View</a>
 			<!-- <a href="/display">Audience View</a> -->
 			<a href="/settings">Settings</a>
+			<p id="funny-picture-status"></p>
 			<img id="funny-picture" class="center"/>
 		</div>
 		
@@ -72,9 +73,43 @@
 			
 			function loadFunnyPicture(force){
 				const funnyPicture = document.getElementById("funny-picture");
+				const funnyPictureStatus = document.getElementById("funny-picture-status");
 				
 				// randomize funny picture
 				const picData = force !== undefined ? funnyPictures[force] : funnyPictures[Math.floor(Math.random()*funnyPictures.length)];
+				const picIndex = funnyPictures.indexOf(picData);
+				
+				let hasAchievement = window.localStorage.getItem("foundPicsAchievement");
+				
+				window.localStorage.setItem("totalFunny", funnyPictures.length);
+				
+				if(!hasAchievement){
+					let foundPics = window.localStorage.getItem("foundPics");
+					
+					if(!foundPics){
+						window.localStorage.setItem("foundPics", "[]");
+						
+						foundPics = "[]";
+					}
+					
+					foundPics = JSON.parse(foundPics);
+					
+					foundPics[picIndex] = true;
+					
+					if(foundPics.filter(e => !!e).length === funnyPictures.length){
+						alert("Achievement unlocked!  You've found all " + funnyPictures.length + " funny pictures!");
+						
+						window.localStorage.setItem("foundPicsAchievement", "true");
+						
+						hasAchievement = true;
+					}
+					
+					window.localStorage.setItem("foundPics", JSON.stringify(foundPics));
+				}
+				
+				let appendage = hasAchievement ? "(you've found all " + funnyPictures.length + "!)" : "(can you find them all??)";
+				
+				funnyPictureStatus.textContent = "Funny picture #" + (picIndex+1) + "/" + funnyPictures.length + " " + appendage;
 				
 				if(picData.url){
 					funnyPicture.src = picData.url;
