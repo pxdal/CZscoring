@@ -4,9 +4,5 @@ significant changes between each commit will be written below to avoid clogging 
 
 # changes:
 
-- added a submission status indicator to the send score button
-- added a total set counter next to the set selector to make it easier to see when another scorer adds a set to a match
-- fixed bug where unsuccessful state changes would still refresh the match cache
-- removed username prompts
-- added BUGS.md to track known bugs
-- added an achievement for finding all of the funny pictures (very important)
+- added 3 NEW funny pictures!
+	- previous achievement progress is still saved (if you had the achievement before, you will lose it but you will only need to find the new pictures to re-earn it)

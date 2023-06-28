@@ -68,6 +68,19 @@
 				{
 					url: "https://media.discordapp.net/attachments/1019731582812176416/1052333135301460000/Screenshot_2022-11-27_205941.png",
 					title: "hey how you doin lil mama let me whisper in ya ear"
+				},
+				// ALL NEW! 6/27/23
+				{
+					url: "/static/images/percentblack.png",
+					title: "7392 pixels out of 160000"
+				},
+				{
+					url: "/static/images/crossbowtyler.jpg",
+					title: "did you just make fun of band???"
+				},
+				{
+					url: "/static/images/peepsonhisthrone.png",
+					title: "pee piss"
 				}
 			];
 			
@@ -79,9 +92,17 @@
 				const picData = force !== undefined ? funnyPictures[force] : funnyPictures[Math.floor(Math.random()*funnyPictures.length)];
 				const picIndex = funnyPictures.indexOf(picData);
 				
-				let hasAchievement = window.localStorage.getItem("foundPicsAchievement");
+				// check to make sure total picture counts match (if they don't, reset achievement progress)
+				const currentTotal = +window.localStorage.getItem("totalFunny");
+				
+				if(currentTotal !== funnyPictures.length){
+					// reset progress
+					window.localStorage.removeItem("foundPicsAchievement");
+				}
 				
 				window.localStorage.setItem("totalFunny", funnyPictures.length);
+				
+				let hasAchievement = window.localStorage.getItem("foundPicsAchievement");
 				
 				if(!hasAchievement){
 					let foundPics = window.localStorage.getItem("foundPics");
@@ -96,7 +117,7 @@
 					
 					foundPics[picIndex] = true;
 					
-					if(foundPics.filter(e => !!e).length === funnyPictures.length){
+					if(foundPics.filter(e => !!e).length >= funnyPictures.length){
 						alert("Achievement unlocked!  You've found all " + funnyPictures.length + " funny pictures!");
 						
 						window.localStorage.setItem("foundPicsAchievement", "true");
