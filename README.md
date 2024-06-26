@@ -1,6 +1,6 @@
 # CZscoring
 
-Scoring software for the DHS Robotics 2023 Summer Class Game "Ball Blast".
+Scoring software for the DHS Robotics 2023 Summer Class Game "Ball Blast" and 2024 Summer Class Game "Mineral Mayhem".
 
 Each year, the Dartmouth High School Robotics Club hosts a micro-FTC game for middle schoolers over the course of a week.  Students build robots using REV Control Hubs and Tetrix Kits to compete in an FTC style game fabricated by the members of the club.  At the end of the week, the robots compete in a 2 stage tournament similar to FTC competitions.  This software allows refs to score the matches of this tournament and upload them digitally, which allows the tournament to run faster.  It also exposes a display that updates in real time for the audience to make the viewing experience more enjoyable for those who may not understand the game.
 
@@ -8,11 +8,9 @@ Each year, the Dartmouth High School Robotics Club hosts a micro-FTC game for mi
 
 ## local installation
 
-1. download the software from https://czscoring.thechickenman.repl.co/ (click the button that says "Download CZScoring") and unzip it
-2. run the `setup.bat` file (double click it as you would any other executable) and wait for it to finish.  this will finish installing all of the stuff the software needs to run.
-3. download `credentials.json` from https://czscoring.thechickenman.repl.co/
-4. move `credentials.json` to the `server` folder (without this, the software will not work properly and probably throw a complicated error)
-5. look in `options.json` (you can open this with notepad) and modify values as needed:
+1. run the `setup.bat` file (double click it as you would any other executable) and wait for it to finish.  this will finish installing all of the stuff the software needs to run.
+2. create `credentials.json` in the `server` folder and fill in the proper values (see **credentials.json** section below)
+3. modify `options.json` as needed:
 
     ```
     {
@@ -20,9 +18,22 @@ Each year, the Dartmouth High School Robotics Club hosts a micro-FTC game for mi
     	"groupStageMatchCount": the number of matches in the group stage.  the software can figure this out on its own if you don't put this in, but it can be a little volatile if you have to restart the server.  generally it's better just to put it here if you know it.
     }
     ```
-6. congratulations!  you've successfully installed the scoring software.  note that this only needs to be done once in total, on one computer total.
+4. congratulations!  you've successfully installed the scoring software.  note that this only needs to be done once on one computer.
 
 note that the software can only manage one tournament at a time once it's running, and needs to be restarted any time `tournamentId` is changed.
+
+## credentials.json
+
+`credentials.json` holds the app credentials.  an "app" is required to access the api, even if logging in via oauth (aka using someone's account).  logging in via oauth just gives the app permission to do everything it needs to do with the api.  the app has three attributes which are required by the challonge api when logging in via oauth, so we store those in `credentials.json`.  the format is shown below:
+
+```
+{
+	"clientId": (app client id here...),
+	"clientSecret": (app client secret here...),
+	"redirectUri": (app redirect uri here...)
+}
+```
+
 
 # running
 
@@ -49,7 +60,7 @@ at this point windows firewall will prompt you that it needs to communicate on p
 
 the software can then be used by navigation to the url provided and following instructions from there to log in to challonge via oauth.
 
-anyone who wants to access the online app can do so through the url provided.  the process of running the software only needs to be run once on one computer, which will allow anyone on the same wifi as that computer to access the web app.
+anyone who wants to access the online app can do so through the url provided as long as they are on the same network.  the process of running the software only needs to be run once on one computer, which will allow anyone on the same wifi as that computer to access the web app.
 
 # developer documentation
 
@@ -62,26 +73,14 @@ anyone who wants to access the online app can do so through the url provided.  t
 - `./client` holds the code for the clients, and is generally responsible for exposing the ref's scoring UI, the audience's active view of the scoring, etc.
     - `./client/static/` holds "static" assets (basically, files that can be accessed through GET requests as they are in the static folder)
         - `./client/static/css` holds stylesheets
-        - `./client/static/js` holds javascript, most of which are "modules"
+        - `./client/static/js` holds javascript, most of which are modules
             - `./client/static/js/games` holds game templates in javascript form
-
-## credentials.json
-
-`credentials.json` holds the app credentials.  an "app" is required to access the api, even if logging in via oauth (aka using someone's account).  logging in via oauth just gives the app permission to do everything it needs to do with the api.  the app has three attributes which are required by the challonge api when logging in via oauth, hence `credentials.json`.  the format is shown below:
-
-```
-{
-	"clientId": (app client id here...),
-	"clientSecret": (app client secret here...),
-	"redirectUri": (app redirect uri here...)
-}
-```
 
 ## the game format
 
-the `client/static/js/games` folder holds the templates for games, such as Ball Blast, for scoresheets.  In other words, they store files containing details on objectives and what they're worth.
+the `client/static/js/games` folder holds the templates for games, such as Ball Blast, for scoresheets.  game templates are files containing details on objectives and what they're worth.
 
-to create your own game, create a new file in the `games` folder.  title it whatever you want ,but ideally use the name of your game for clarity.  also be sure that the extension is `.mjs`.  then, copy-paste the following into your new file, replacing `YOUR_GAME` with the name of your game:
+to create your own game, create a new file in the `games` folder.  title it whatever you want, but ideally use the name of your game for clarity.  also be sure that the extension is `.mjs`.  then, copy-paste the following into your new file, replacing `YOUR_GAME` with the name of your game:
 
 ```
 import { ScoresheetTemplate } from "/static/js/score.mjs";
@@ -220,7 +219,7 @@ export const CURRENT_GAME = myGame;
 
 resulting scoresheet:
 
-![example scoresheet](https://cdn.discordapp.com/attachments/806212729550536744/1120928805587001414/image.png "Voila!")
+![example scoresheet](/images/mygame.png "Voila!")
 
 and there you have it!
 
