@@ -83,11 +83,11 @@ class ChallongeAPI {
 		return ChallongeAPI.ALL_TOURNAMENT_STATE_CHANGES.includes(stateChange);
 	}
 	
-	static createParticipantData(name, uploadId){
+	static createParticipantData(name, uploadId, realId){
 		return {
 			name: name,
-			uploadId: uploadId
-			// TODO: include real id? (upload id doesn't work with participant request)
+			uploadId: uploadId,
+			realId: realId
 		};
 	}
 	
@@ -344,6 +344,8 @@ class ChallongeAPI {
 		const { player1Set, player2Set } = this.formatMatchSets(scores);
 		const { player1Advancing, player2Advancing } = this.determineAdvancement(scores);
 		
+		const tie = !player1Advancing && !player2Advancing;
+		
 		return this.apiRequest("/tournaments/" + tournamentId + "/matches/" + matchId + ".json", "PUT", {
 			data: {
 				type: "Match",
@@ -359,7 +361,8 @@ class ChallongeAPI {
 							score_set: player2Set,
 							advancing: player2Advancing
 						}
-					]
+					],
+					tie: tie
 				}
 			}
 		});
@@ -399,6 +402,15 @@ class ChallongeAPI {
 		const availableTournamentMatches = included.filter(e => e.type === "match");
 		
 		return availableTournamentMatches;
+	}
+	
+	getRawTournamentParticipants(tournamentInfo){
+		// get included data
+		const included = tournamentInfo.included;
+		
+		const tournamentParticipants = included.filter(e => e.type == "participant");
+		
+		return tournamentParticipants;
 	}
 	
 	/**
@@ -563,6 +575,19 @@ class ChallongeTwoStageTournament {
 		// get raw tournament info
 		const rawTournamentInfo = await this.api.getRawTournamentInfo(this.id);
 		
+		// organize participant real ids by name
+		// challonge at some point between 2023-2024 stopped using the per match participant ids and instead switched to the proper global ones as they are included in tournament info.
+		const participants = this.api.getRawTournamentParticipants(rawTournamentInfo);
+		
+		const participantRealIds = {};
+		
+		for(const participant of participants){
+			const name = participant.attributes.name;
+			const realId = participant.id;
+			
+			participantRealIds[name] = realId;
+		}
+		
 		// get state
 		const state = this.api.getTournamentState(rawTournamentInfo);
 		
@@ -603,9 +628,11 @@ class ChallongeTwoStageTournament {
 					participants = await this.api.getMatchParticipantsById(this.id, matchId);
 					
 					// cache names
-					for(let j = 0; j < Object.keys(participants).length; j++){
-						const participant = participants[Object.keys(participants)[j]];
+					for(const p of Object.keys(participants)){
+						const participant = participants[p];
 						const id = participant.uploadId;
+						
+						participant.realId = participantRealIds[participant.name];
 						
 						this.addToParticipantData(id, "name", participant.name);
 					}
@@ -613,7 +640,7 @@ class ChallongeTwoStageTournament {
 					// no need to continue, all participants are fetched as a result of the api request
 					break;
 				} else {
-					participants[participantKey] = ChallongeAPI.createParticipantData(cachedName, participantId);
+					participants[participantKey] = ChallongeAPI.createParticipantData(cachedName, participantId, participantRealIds[cachedName]);
 				}
 			}
 			
@@ -691,8 +718,8 @@ class ChallongeTwoStageTournament {
 		
 		// send scores to challonge
 		this.api.sendScoresForMatch(this.id, match.id, {
-			player1UploadId: match.participants.player1.uploadId,
-			player2UploadId: match.participants.player2.uploadId,
+			player1UploadId: match.participants.player1.realId,
+			player2UploadId: match.participants.player2.realId,
 			
 			scores: match.sets
 		}).catch(console.error);
